@@ -43,6 +43,16 @@ struct HomeView: View {
             }
             .navigationTitle("LifeMemo")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink {
+                        AdvancedSearchView()
+                            .environmentObject(container)
+                            .environmentObject(coordinator)
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                    }
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
                         SettingsView(container: container)

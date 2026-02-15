@@ -28,6 +28,11 @@ final class SessionDetailViewModel: ObservableObject {
     // Export
     @Published var exportFileURL: URL?
     @Published var showExportSheet: Bool = false
+    @Published var showExportOptions: Bool = false
+
+    // Playback
+    @Published var showPlayback: Bool = false
+    @Published private(set) var playbackController: SyncedPlaybackController?
 
     // Errors
     @Published var errorMessage: String?
@@ -41,24 +46,31 @@ final class SessionDetailViewModel: ObservableObject {
 
     let sessionId: UUID
     private let repository: SessionRepository
+    private let fileStore: FileStore
     private let qnaService: SimpleQnAService
     private let summarizer: SimpleSummarizer
     private let exportService: ExportService
+    let enhancedExportService: EnhancedExportService
+    private var audioPlayer: AudioPlayer?
 
     // MARK: - Init
 
     init(
         sessionId: UUID,
         repository: SessionRepository,
+        fileStore: FileStore,
         qnaService: SimpleQnAService,
         summarizer: SimpleSummarizer,
-        exportService: ExportService
+        exportService: ExportService,
+        enhancedExportService: EnhancedExportService
     ) {
         self.sessionId = sessionId
         self.repository = repository
+        self.fileStore = fileStore
         self.qnaService = qnaService
         self.summarizer = summarizer
         self.exportService = exportService
+        self.enhancedExportService = enhancedExportService
     }
 
     // MARK: - Data Loading
@@ -85,7 +97,51 @@ final class SessionDetailViewModel: ObservableObject {
             )
         }
 
+        setupPlayback(entity: entity)
         isLoading = false
+    }
+
+    // MARK: - Playback
+
+    private func setupPlayback(entity: SessionEntity) {
+        guard entity.audioKept else {
+            playbackController = nil
+            return
+        }
+
+        let chunks: [AudioPlayer.ChunkInfo] = entity.chunksArray.compactMap { chunk in
+            guard !chunk.audioDeleted,
+                  let relPath = chunk.relativePath,
+                  let url = fileStore.resolveAbsoluteURL(relativePath: relPath) else { return nil }
+
+            let startAt = chunk.startAt ?? entity.startedAt ?? Date()
+            let sessionStart = entity.startedAt ?? Date()
+            let offsetMs = Int64(startAt.timeIntervalSince(sessionStart) * 1000)
+            let durationMs = Int64(chunk.durationSec * 1000)
+
+            return AudioPlayer.ChunkInfo(
+                chunkId: chunk.id ?? UUID(),
+                url: url,
+                startOffsetMs: max(0, offsetMs),
+                durationMs: durationMs
+            )
+        }
+
+        guard !chunks.isEmpty else {
+            playbackController = nil
+            return
+        }
+
+        let player = AudioPlayer()
+        player.loadSession(chunks: chunks)
+        self.audioPlayer = player
+
+        let controller = SyncedPlaybackController(audioPlayer: player)
+        let segments = entity.segmentsArray.map { seg in
+            (id: seg.id ?? UUID(), startMs: seg.startMs, endMs: seg.endMs, text: seg.text ?? "")
+        }
+        controller.loadSegments(segments)
+        self.playbackController = controller
     }
 
     // MARK: - Q&A

@@ -16,9 +16,11 @@ struct SessionDetailView: View {
             wrappedValue: SessionDetailViewModel(
                 sessionId: sessionId,
                 repository: container.repository,
+                fileStore: container.fileStore,
                 qnaService: container.qna,
                 summarizer: container.summarizer,
-                exportService: container.exportService
+                exportService: container.exportService,
+                enhancedExportService: container.enhancedExportService
             )
         )
     }
@@ -49,6 +51,32 @@ struct SessionDetailView: View {
         .sheet(isPresented: $viewModel.showExportSheet) {
             if let url = viewModel.exportFileURL {
                 ShareSheet(activityItems: [url])
+            }
+        }
+        .sheet(isPresented: $viewModel.showExportOptions) {
+            ExportOptionsView(
+                sessionId: viewModel.sessionId,
+                exportService: viewModel.enhancedExportService
+            )
+        }
+        .sheet(isPresented: $viewModel.showPlayback) {
+            NavigationStack {
+                if let controller = viewModel.playbackController {
+                    PlaybackView(controller: controller)
+                        .navigationTitle("Playback")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") { viewModel.showPlayback = false }
+                            }
+                        }
+                } else {
+                    ContentUnavailableView(
+                        "No Audio",
+                        systemImage: "speaker.slash",
+                        description: Text("Audio is not available for playback.")
+                    )
+                }
             }
         }
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
@@ -367,13 +395,25 @@ struct SessionDetailView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 12) {
+            // Playback
+            if session.audioKept {
                 ActionButton(
-                    title: "Export MD",
-                    icon: "doc.richtext",
+                    title: "Play Audio",
+                    icon: "play.fill",
                     color: Color.accentColor
                 ) {
-                    viewModel.exportMarkdown()
+                    viewModel.showPlayback = true
+                }
+            }
+
+            // Export
+            HStack(spacing: 12) {
+                ActionButton(
+                    title: "Export",
+                    icon: "square.and.arrow.up",
+                    color: Color.accentColor
+                ) {
+                    viewModel.showExportOptions = true
                 }
 
                 ActionButton(

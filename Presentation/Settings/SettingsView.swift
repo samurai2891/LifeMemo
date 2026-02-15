@@ -6,6 +6,7 @@ struct SettingsView: View {
     // MARK: - Environment
 
     @EnvironmentObject private var permissionService: SpeechPermissionService
+    @EnvironmentObject private var container: AppContainer
     @StateObject private var viewModel: SettingsViewModel
 
     // MARK: - Init
@@ -23,7 +24,9 @@ struct SettingsView: View {
     var body: some View {
         Form {
             languageSection
+            audioQualitySection
             permissionsSection
+            storageSection
             privacySection
             aboutSection
         }
@@ -106,6 +109,43 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    // MARK: - Audio Quality Section
+
+    private var audioQualitySection: some View {
+        Section {
+            Picker("Recording Quality", selection: $viewModel.audioQualityProfile) {
+                ForEach(AudioConfiguration.QualityProfile.allCases) { profile in
+                    VStack(alignment: .leading) {
+                        Text(profile.displayName)
+                    }
+                    .tag(profile)
+                }
+            }
+            .pickerStyle(.menu)
+        } header: {
+            Text("Audio Quality")
+        } footer: {
+            Text(viewModel.audioQualityProfile.description)
+        }
+    }
+
+    // MARK: - Storage Section
+
+    private var storageSection: some View {
+        Section {
+            NavigationLink {
+                StorageManagementView(
+                    storageManager: container.storageManager,
+                    cloudSyncManager: container.cloudSyncManager
+                )
+            } label: {
+                Label("Storage & Sync", systemImage: "externaldrive")
+            }
+        } header: {
+            Text("Data")
         }
     }
 

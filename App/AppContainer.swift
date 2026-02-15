@@ -3,6 +3,9 @@ import CoreData
 
 @MainActor
 final class AppContainer: ObservableObject {
+
+    // MARK: - Phase 1: Core
+
     let coreData: CoreDataStack
     let repository: SessionRepository
     let fileStore: FileStore
@@ -19,6 +22,29 @@ final class AppContainer: ObservableObject {
     let search: SimpleSearchService
     let qna: SimpleQnAService
     let exportService: ExportService
+
+    // MARK: - Phase 2A: Audio Stability
+
+    let audioInterruptionHandler: AudioInterruptionHandler
+    let memoryPressureMonitor: MemoryPressureMonitor
+    let recordingHealthMonitor: RecordingHealthMonitor
+
+    // MARK: - Phase 2B: Advanced Search
+
+    let fts5Manager: FTS5Manager
+    let advancedSearch: AdvancedSearchService
+    let paginatedLoader: PaginatedSessionLoader
+
+    // MARK: - Phase 2D: iCloud + Storage
+
+    let cloudSyncManager: CloudSyncManager
+    let storageManager: StorageManager
+
+    // MARK: - Phase 2E: Enhanced Export
+
+    let enhancedExportService: EnhancedExportService
+
+    // MARK: - Init
 
     init() {
         let coreData = CoreDataStack(modelName: "LifeMemo")
@@ -51,10 +77,21 @@ final class AppContainer: ObservableObject {
         )
         self.chunkRecorder = chunkRecorder
 
+        let audioInterruptionHandler = AudioInterruptionHandler()
+        self.audioInterruptionHandler = audioInterruptionHandler
+
+        let memoryPressureMonitor = MemoryPressureMonitor()
+        self.memoryPressureMonitor = memoryPressureMonitor
+
+        let recordingHealthMonitor = RecordingHealthMonitor()
+        self.recordingHealthMonitor = recordingHealthMonitor
+
         self.recordingCoordinator = RecordingCoordinator(
             repository: repository,
             audioSession: audioSession,
-            chunkRecorder: chunkRecorder
+            chunkRecorder: chunkRecorder,
+            interruptionHandler: audioInterruptionHandler,
+            healthMonitor: recordingHealthMonitor
         )
 
         self.summarizer = SimpleSummarizer(repository: repository)
@@ -64,5 +101,32 @@ final class AppContainer: ObservableObject {
             repository: repository,
             fileStore: fileStore
         )
+
+        // Phase 2B: Advanced Search
+        let fts5Manager = FTS5Manager()
+        self.fts5Manager = fts5Manager
+        self.advancedSearch = AdvancedSearchService(
+            fts5Manager: fts5Manager,
+            context: coreData.viewContext
+        )
+        self.paginatedLoader = PaginatedSessionLoader(context: coreData.viewContext)
+
+        // Phase 2D: iCloud + Storage
+        self.cloudSyncManager = CloudSyncManager()
+        self.storageManager = StorageManager(
+            fileStore: fileStore,
+            repository: repository
+        )
+
+        // Phase 2E: Enhanced Export
+        self.enhancedExportService = EnhancedExportService(
+            repository: repository,
+            fileStore: fileStore
+        )
+
+        // Wire memory pressure cleanup to Core Data
+        memoryPressureMonitor.onShouldCleanup = { [weak coreData] in
+            coreData?.viewContext.refreshAllObjects()
+        }
     }
 }

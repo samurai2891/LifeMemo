@@ -3,9 +3,9 @@ import Foundation
 /// Coordinates the full recording lifecycle for the UI layer.
 ///
 /// Manages transitions between `RecordingState` values, drives the elapsed-time
-/// counter, and delegates audio capture to `ChunkedAudioRecorder`. Conforms to
-/// `ObservableObject` so SwiftUI views can bind directly to `state` and
-/// `elapsedSeconds`.
+/// counter, and delegates audio capture to `ChunkedAudioRecorder`. Integrates
+/// with `AudioInterruptionHandler` for interruption recovery and
+/// `RecordingHealthMonitor` for long-session health monitoring.
 @MainActor
 final class RecordingCoordinator: ObservableObject {
 
@@ -19,6 +19,8 @@ final class RecordingCoordinator: ObservableObject {
     private let repository: SessionRepository
     private let audioSession: AudioSessionConfigurator
     private let chunkRecorder: ChunkedAudioRecorder
+    private let interruptionHandler: AudioInterruptionHandler
+    private let healthMonitor: RecordingHealthMonitor
 
     // MARK: - Internal State
 
@@ -30,22 +32,22 @@ final class RecordingCoordinator: ObservableObject {
     init(
         repository: SessionRepository,
         audioSession: AudioSessionConfigurator,
-        chunkRecorder: ChunkedAudioRecorder
+        chunkRecorder: ChunkedAudioRecorder,
+        interruptionHandler: AudioInterruptionHandler,
+        healthMonitor: RecordingHealthMonitor
     ) {
         self.repository = repository
         self.audioSession = audioSession
         self.chunkRecorder = chunkRecorder
+        self.interruptionHandler = interruptionHandler
+        self.healthMonitor = healthMonitor
+
+        setupInterruptionHandling()
     }
 
     // MARK: - Public API
 
     /// Starts an always-on recording session.
-    ///
-    /// Creates a new session in the repository, activates the audio session,
-    /// and begins chunked recording. On failure, the audio session is deactivated
-    /// and state transitions to `.error`.
-    ///
-    /// - Parameter languageMode: The language for downstream transcription.
     func startAlwaysOn(languageMode: LanguageMode) {
         do {
             try audioSession.activateRecordingSession()
@@ -55,6 +57,7 @@ final class RecordingCoordinator: ObservableObject {
             repository.updateSessionStatus(sessionId: sessionId, status: .recording)
             self.state = .recording(sessionId: sessionId)
             startElapsedTimer()
+            healthMonitor.startMonitoring(sessionStart: Date())
         } catch {
             audioSession.deactivate()
             self.state = .error(
@@ -64,13 +67,12 @@ final class RecordingCoordinator: ObservableObject {
     }
 
     /// Stops the current recording session.
-    ///
-    /// Transitions through `.stopping`, finalizes the last chunk, marks the
-    /// session as `.processing`, and returns to `.idle`.
     func stop() {
         guard case let .recording(sessionId) = state else { return }
         state = .stopping
         stopElapsedTimer()
+        healthMonitor.stopMonitoring()
+        interruptionHandler.resetState()
 
         Task {
             await chunkRecorder.stop()
@@ -90,6 +92,43 @@ final class RecordingCoordinator: ObservableObject {
         guard case let .recording(sessionId) = state else { return }
         let ms = repository.currentElapsedMs(sessionId: sessionId)
         repository.addHighlight(sessionId: sessionId, atMs: ms)
+    }
+
+    // MARK: - Interruption Handling
+
+    private func setupInterruptionHandling() {
+        interruptionHandler.onShouldPause = { [weak self] in
+            guard let self else { return }
+            // Pause chunked recording on interruption
+            Task { @MainActor in
+                await self.chunkRecorder.stop()
+            }
+        }
+
+        interruptionHandler.onShouldResume = { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in
+                guard case let .recording(sessionId) = self.state else { return }
+                do {
+                    try self.audioSession.activateRecordingSession()
+                    try self.chunkRecorder.start(
+                        sessionId: sessionId,
+                        languageMode: self.currentLanguage
+                    )
+                } catch {
+                    self.state = .error(
+                        message: "Failed to resume after interruption: \(error.localizedDescription)"
+                    )
+                }
+            }
+        }
+
+        interruptionHandler.onRecoveryFailed = { [weak self] reason in
+            guard let self else { return }
+            Task { @MainActor in
+                self.state = .error(message: reason)
+            }
+        }
     }
 
     // MARK: - Elapsed Timer
