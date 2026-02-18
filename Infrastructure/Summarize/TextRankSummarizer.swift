@@ -1,19 +1,17 @@
 import Foundation
 import NaturalLanguage
 
-/// On-device extractive summarizer using Apple's NaturalLanguage framework.
-/// Scores sentences by TF-IDF relevance, position, length, and named entity density.
+/// Graph-based extractive summarizer using TextRank algorithm.
+/// Builds a similarity graph between sentences and ranks by PageRank-style iteration.
 @MainActor
-final class NLExtractiveSummarizer {
-
-    // MARK: - Configuration
+final class TextRankSummarizer {
 
     struct Config {
         var maxSentences: Int = 5
         var maxKeywords: Int = 15
-        var positionBias: Double = 0.3
-        var lengthPenaltyMin: Int = 5
-        var lengthPenaltyMax: Int = 80
+        var dampingFactor: Double = 0.85
+        var convergenceThreshold: Double = 0.0001
+        var maxIterations: Int = 100
 
         static let `default` = Config()
         static let brief = Config(maxSentences: 3, maxKeywords: 8)
@@ -26,14 +24,12 @@ final class NLExtractiveSummarizer {
         self.config = config
     }
 
-    // MARK: - Public API
-
     func summarize(text: String) -> SummarizationResult {
         let startTime = CFAbsoluteTimeGetCurrent()
 
         guard !text.isEmpty else {
             return SummarizationResult(
-                algorithm: .tfidf,
+                algorithm: .textRank,
                 sentences: [], keywords: [], detectedLanguage: nil,
                 processingTime: 0, inputWordCount: 0
             )
@@ -51,7 +47,7 @@ final class NLExtractiveSummarizer {
                 )
             }
             return SummarizationResult(
-                algorithm: .tfidf,
+                algorithm: .textRank,
                 sentences: single.map { [$0] } ?? [],
                 keywords: extractKeywords(text),
                 detectedLanguage: detectedLang,
@@ -60,16 +56,58 @@ final class NLExtractiveSummarizer {
             )
         }
 
-        let tfidfScores = computeTFIDF(sentences: sentences)
+        // Build word vectors for each sentence
+        let sentenceVectors = sentences.map { wordVector($0) }
+
+        // Build similarity matrix
+        let n = sentences.count
+        var similarity = Array(repeating: Array(repeating: 0.0, count: n), count: n)
+        for i in 0..<n {
+            for j in (i + 1)..<n {
+                let sim = cosineSimilarity(sentenceVectors[i], sentenceVectors[j])
+                similarity[i][j] = sim
+                similarity[j][i] = sim
+            }
+        }
+
+        // Normalize similarity matrix (row-wise)
+        var normalized = Array(repeating: Array(repeating: 0.0, count: n), count: n)
+        for i in 0..<n {
+            let rowSum = similarity[i].reduce(0, +)
+            guard rowSum > 0 else { continue }
+            for j in 0..<n {
+                normalized[i][j] = similarity[i][j] / rowSum
+            }
+        }
+
+        // PageRank iteration
+        var scores = Array(repeating: 1.0 / Double(n), count: n)
+        let d = config.dampingFactor
+
+        for _ in 0..<config.maxIterations {
+            var newScores = Array(repeating: 0.0, count: n)
+            for i in 0..<n {
+                var incomingSum = 0.0
+                for j in 0..<n {
+                    if i != j {
+                        incomingSum += normalized[j][i] * scores[j]
+                    }
+                }
+                newScores[i] = (1.0 - d) / Double(n) + d * incomingSum
+            }
+
+            // Check convergence
+            let diff = zip(scores, newScores).map { abs($0 - $1) }.reduce(0, +)
+            scores = newScores
+            if diff < config.convergenceThreshold { break }
+        }
+
+        // Rank sentences
         let ranked = sentences.enumerated().map { index, sentence in
-            let score = tfidfScores[index] * 0.4
-                + positionScore(index: index, total: sentences.count) * config.positionBias
-                + lengthScore(sentence: sentence) * 0.15
-                + namedEntityDensity(sentence: sentence) * 0.15
-            return SummarizationResult.RankedSentence(
+            SummarizationResult.RankedSentence(
                 id: UUID(),
                 text: sentence.trimmingCharacters(in: .whitespacesAndNewlines),
-                score: score,
+                score: scores[index],
                 positionIndex: index
             )
         }
@@ -80,13 +118,43 @@ final class NLExtractiveSummarizer {
         let elapsed = CFAbsoluteTimeGetCurrent() - startTime
 
         return SummarizationResult(
-            algorithm: .tfidf,
+            algorithm: .textRank,
             sentences: topSentences,
             keywords: extractKeywords(text),
             detectedLanguage: detectedLang,
             processingTime: elapsed,
             inputWordCount: wordCount
         )
+    }
+
+    // MARK: - Similarity
+
+    private func wordVector(_ text: String) -> [String: Double] {
+        let words = tokenizeWords(text)
+        var freq: [String: Double] = [:]
+        for w in words { freq[w, default: 0] += 1 }
+        return freq
+    }
+
+    private func cosineSimilarity(_ a: [String: Double], _ b: [String: Double]) -> Double {
+        let allKeys = Set(a.keys).union(b.keys)
+        guard !allKeys.isEmpty else { return 0 }
+
+        var dotProduct = 0.0
+        var normA = 0.0
+        var normB = 0.0
+
+        for key in allKeys {
+            let va = a[key, default: 0]
+            let vb = b[key, default: 0]
+            dotProduct += va * vb
+            normA += va * va
+            normB += vb * vb
+        }
+
+        let denom = sqrt(normA) * sqrt(normB)
+        guard denom > 0 else { return 0 }
+        return dotProduct / denom
     }
 
     // MARK: - Language & Tokenization
@@ -126,89 +194,12 @@ final class NLExtractiveSummarizer {
         tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
             let sentence = String(text[range])
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            if countWords(sentence) >= config.lengthPenaltyMin {
+            if countWords(sentence) >= 5 {
                 sentences.append(sentence)
             }
             return true
         }
         return sentences
-    }
-
-    // MARK: - TF-IDF
-
-    private func computeTFIDF(sentences: [String]) -> [Double] {
-        let total = Double(sentences.count)
-        let tokenized = sentences.map { tokenizeWords($0) }
-
-        // Document frequency: how many sentences contain each term
-        var df: [String: Int] = [:]
-        for words in tokenized {
-            for term in Set(words) {
-                df[term, default: 0] += 1
-            }
-        }
-
-        // Per-sentence TF-IDF score
-        let scores = tokenized.map { words -> Double in
-            guard !words.isEmpty else { return 0.0 }
-            var tf: [String: Int] = [:]
-            for w in words { tf[w, default: 0] += 1 }
-            let len = Double(words.count)
-            return tf.reduce(0.0) { acc, pair in
-                let idf = log(total / Double(df[pair.key, default: 1]))
-                return acc + (Double(pair.value) / len) * idf
-            }
-        }
-
-        // Normalize to 0..1
-        let maxScore = scores.max() ?? 1.0
-        guard maxScore > 0 else { return scores }
-        return scores.map { $0 / maxScore }
-    }
-
-    // MARK: - Scoring Signals
-
-    private func positionScore(index: Int, total: Int) -> Double {
-        guard total > 1 else { return 1.0 }
-        if index == 0 { return 1.0 }
-        if index == total - 1 { return 0.8 }
-        return 1.0 - (Double(index) / Double(total)) * 0.5
-    }
-
-    private func lengthScore(sentence: String) -> Double {
-        let words = countWords(sentence)
-        if words >= 10, words <= 40 { return 1.0 }
-        if words < config.lengthPenaltyMin {
-            return Double(words) / Double(config.lengthPenaltyMin)
-        }
-        if words > config.lengthPenaltyMax {
-            return Double(config.lengthPenaltyMax) / Double(words)
-        }
-        if words < 10 {
-            return 0.6 + 0.4 * Double(words - config.lengthPenaltyMin)
-                / Double(10 - config.lengthPenaltyMin)
-        }
-        return 0.6 + 0.4 * (1.0 - Double(words - 40)
-            / Double(config.lengthPenaltyMax - 40))
-    }
-
-    private func namedEntityDensity(sentence: String) -> Double {
-        let tagger = NLTagger(tagSchemes: [.nameType])
-        tagger.string = sentence
-        let opts: NLTagger.Options = [.omitWhitespace, .omitPunctuation, .joinNames]
-        var entityCount = 0
-        tagger.enumerateTags(
-            in: sentence.startIndex..<sentence.endIndex,
-            unit: .word, scheme: .nameType, options: opts
-        ) { tag, _ in
-            if let tag, [.personalName, .placeName, .organizationName].contains(tag) {
-                entityCount += 1
-            }
-            return true
-        }
-        let words = countWords(sentence)
-        guard words > 0 else { return 0.0 }
-        return min(Double(entityCount) / Double(words), 1.0)
     }
 
     // MARK: - Keyword Extraction
@@ -217,7 +208,6 @@ final class NLExtractiveSummarizer {
         var counts: [String: Int] = [:]
         let opts: NLTagger.Options = [.omitWhitespace, .omitPunctuation, .joinNames]
 
-        // Nouns via lexical class
         let lexTagger = NLTagger(tagSchemes: [.lexicalClass])
         lexTagger.string = text
         lexTagger.enumerateTags(
@@ -230,7 +220,6 @@ final class NLExtractiveSummarizer {
             return true
         }
 
-        // Named entities with boosted weight
         let entTagger = NLTagger(tagSchemes: [.nameType])
         entTagger.string = text
         entTagger.enumerateTags(

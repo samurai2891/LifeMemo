@@ -24,6 +24,7 @@ final class SessionDetailViewModel: ObservableObject {
 
     // Summary
     @Published private(set) var isBuildingSummary: Bool = false
+    @Published var selectedAlgorithm: SummarizationAlgorithm = SummarizationPreference.preferredAlgorithm
 
     // Export
     @Published var exportFileURL: URL?
@@ -301,10 +302,12 @@ final class SessionDetailViewModel: ObservableObject {
 
     func buildSummary() {
         isBuildingSummary = true
-        let markdown = summarizer.buildSummaryMarkdown(sessionId: sessionId)
+        SummarizationPreference.preferredAlgorithm = selectedAlgorithm
+        let markdown = summarizer.buildSummaryMarkdown(
+            sessionId: sessionId, algorithm: selectedAlgorithm
+        )
         repository.updateSessionSummary(sessionId: sessionId, markdown: markdown)
 
-        // Reload session to pick up the new summary
         if let entity = repository.fetchSession(id: sessionId) {
             session = entity.toSummary()
         }

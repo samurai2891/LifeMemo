@@ -161,6 +161,20 @@ struct SettingsView: View {
 
     private var summarizationSection: some View {
         Section {
+            Picker("Default Algorithm", selection: Binding(
+                get: { SummarizationPreference.preferredAlgorithm },
+                set: { SummarizationPreference.preferredAlgorithm = $0 }
+            )) {
+                ForEach(SummarizationAlgorithm.allCases) { algo in
+                    Text(algo.displayName).tag(algo)
+                }
+            }
+
+            Toggle("Auto-Summarize", isOn: Binding(
+                get: { SummarizationPreference.autoSummarize },
+                set: { SummarizationPreference.autoSummarize = $0 }
+            ))
+
             NavigationLink {
                 BenchmarkResultsView(benchmark: container.summarizationBenchmark)
             } label: {
@@ -169,7 +183,7 @@ struct SettingsView: View {
         } header: {
             Text("Summarization")
         } footer: {
-            Text("On-device extractive summarization using Apple NaturalLanguage. No data leaves your device.")
+            Text("On-device extractive summarization using Apple NaturalLanguage. No data leaves your device. Auto-Summarize generates a summary when transcription completes.")
         }
     }
 
@@ -357,19 +371,35 @@ private struct BenchmarkResultsView: View {
                 .frame(maxWidth: .infinity)
             }
 
-            ForEach(benchmark.results) { result in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(result.inputSize.rawValue)
-                        .font(.subheadline.bold())
-                    HStack(spacing: 16) {
-                        Label("\(String(format: "%.0f", result.processingTimeMs))ms", systemImage: "clock")
-                        Label("\(String(format: "%.0f", result.wordsPerSecond)) w/s", systemImage: "text.word.spacing")
-                        Label(result.thermalState, systemImage: "thermometer.medium")
+            ForEach(SummarizationAlgorithm.allCases) { algo in
+                let algoResults = benchmark.results.filter { $0.algorithm == algo }
+                if !algoResults.isEmpty {
+                    Section(algo.displayName) {
+                        ForEach(algoResults) { result in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(result.inputSize.rawValue)
+                                    .font(.subheadline.bold())
+                                HStack(spacing: 16) {
+                                    Label(
+                                        "\(String(format: "%.0f", result.processingTimeMs))ms",
+                                        systemImage: "clock"
+                                    )
+                                    Label(
+                                        "\(String(format: "%.0f", result.wordsPerSecond)) w/s",
+                                        systemImage: "text.word.spacing"
+                                    )
+                                    Label(
+                                        result.thermalState,
+                                        systemImage: "thermometer.medium"
+                                    )
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 4)
             }
         }
         .navigationTitle("Summarization Benchmark")

@@ -9,23 +9,34 @@ final class CoreDataStack {
         container.viewContext
     }
 
+    /// Whether the process is running as a test host (XCTest is loaded).
+    private static let isTestHost: Bool = NSClassFromString("XCTestCase") != nil
+
     init(modelName: String) {
         let model = Self.createManagedObjectModel()
         container = NSPersistentContainer(name: modelName, managedObjectModel: model)
 
-        // Custom store URL in Application Support
-        if let description = container.persistentStoreDescriptions.first {
-            let storeURL = Self.storeURL()
-            description.url = storeURL
-            description.shouldMigrateStoreAutomatically = true
-            description.shouldInferMappingModelAutomatically = true
+        if Self.isTestHost {
+            // Use in-memory store when running as test host to avoid
+            // file-backed Core Data conflicts with integration tests.
+            let description = NSPersistentStoreDescription()
+            description.type = NSInMemoryStoreType
+            container.persistentStoreDescriptions = [description]
+        } else {
+            // Custom store URL in Application Support
+            if let description = container.persistentStoreDescriptions.first {
+                let storeURL = Self.storeURL()
+                description.url = storeURL
+                description.shouldMigrateStoreAutomatically = true
+                description.shouldInferMappingModelAutomatically = true
+            }
         }
 
         container.loadPersistentStores { description, error in
             if let error = error {
                 fatalError("Core Data failed to load: \(error.localizedDescription)")
             }
-            // Set database file protection
+            // Set database file protection (skip for in-memory stores)
             if let url = description.url {
                 try? FileManager.default.setAttributes(
                     [.protectionKey: FileProtectionType.completeUnlessOpen],

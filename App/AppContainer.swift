@@ -68,6 +68,8 @@ final class AppContainer: ObservableObject {
     // MARK: - v1.0: Summarization
 
     let nlSummarizer: NLExtractiveSummarizer
+    let textRankSummarizer: TextRankSummarizer
+    let leadSummarizer: LeadSummarizer
     let topicExtractor: TopicExtractor
     let summarizationBenchmark: SummarizationBenchmark
 
@@ -139,6 +141,10 @@ final class AppContainer: ObservableObject {
         // v1.0: Summarization
         let nlSummarizer = NLExtractiveSummarizer()
         self.nlSummarizer = nlSummarizer
+        let textRankSummarizer = TextRankSummarizer()
+        self.textRankSummarizer = textRankSummarizer
+        let leadSummarizer = LeadSummarizer()
+        self.leadSummarizer = leadSummarizer
         let topicExtractor = TopicExtractor()
         self.topicExtractor = topicExtractor
         self.summarizationBenchmark = SummarizationBenchmark()
@@ -146,6 +152,8 @@ final class AppContainer: ObservableObject {
         self.summarizer = SimpleSummarizer(
             repository: repository,
             extractiveSummarizer: nlSummarizer,
+            textRankSummarizer: textRankSummarizer,
+            leadSummarizer: leadSummarizer,
             topicExtractor: topicExtractor
         )
         self.search = SimpleSearchService(repository: repository)

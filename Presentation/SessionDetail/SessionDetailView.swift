@@ -359,6 +359,24 @@ struct SessionDetailView: View {
                 .disabled(viewModel.isBuildingSummary)
             }
 
+            // Algorithm picker
+            HStack(spacing: 8) {
+                Text("Algorithm")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Picker("Algorithm", selection: $viewModel.selectedAlgorithm) {
+                    ForEach(SummarizationAlgorithm.allCases) { algo in
+                        Text(algo.displayName).tag(algo)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Text(viewModel.selectedAlgorithm.description)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+
             if let summary = session.summary {
                 Text(summary)
                     .font(.subheadline)

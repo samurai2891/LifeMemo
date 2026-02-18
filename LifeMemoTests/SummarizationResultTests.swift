@@ -5,6 +5,7 @@ final class SummarizationResultTests: XCTestCase {
 
     func testEmptyResult() {
         let result = SummarizationResult(
+            algorithm: .tfidf,
             sentences: [],
             keywords: [],
             detectedLanguage: nil,
@@ -22,6 +23,7 @@ final class SummarizationResultTests: XCTestCase {
 
         // Even though s2 has highest score, topSentencesText should order by positionIndex
         let result = SummarizationResult(
+            algorithm: .tfidf,
             sentences: [s2, s3, s1], // score-ordered input
             keywords: ["test"],
             detectedLanguage: "en",
@@ -34,8 +36,8 @@ final class SummarizationResultTests: XCTestCase {
 
     func testEquatable() {
         let s1 = SummarizationResult.RankedSentence(id: UUID(), text: "A", score: 1.0, positionIndex: 0)
-        let r1 = SummarizationResult(sentences: [s1], keywords: ["k"], detectedLanguage: "en", processingTime: 0.1, inputWordCount: 5)
-        let r2 = SummarizationResult(sentences: [s1], keywords: ["k"], detectedLanguage: "en", processingTime: 0.1, inputWordCount: 5)
+        let r1 = SummarizationResult(algorithm: .tfidf, sentences: [s1], keywords: ["k"], detectedLanguage: "en", processingTime: 0.1, inputWordCount: 5)
+        let r2 = SummarizationResult(algorithm: .tfidf, sentences: [s1], keywords: ["k"], detectedLanguage: "en", processingTime: 0.1, inputWordCount: 5)
         XCTAssertEqual(r1, r2)
     }
 }

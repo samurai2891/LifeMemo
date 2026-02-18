@@ -5,37 +5,31 @@ import CoreData
 @MainActor
 final class EditHistoryIntegrationTests: XCTestCase {
 
-    private var coordinator: NSPersistentStoreCoordinator!
+    private var container: NSPersistentContainer!
     private var context: NSManagedObjectContext!
     private var repository: SessionRepository!
 
-    /// Isolated model for tests — built fresh to avoid collisions
-    /// with the host app's Core Data stack during initial launch.
-    private static let testModel: NSManagedObjectModel = {
-        CoreDataStack.createTestModel()
-    }()
-
     override func setUp() {
         super.setUp()
-        coordinator = NSPersistentStoreCoordinator(managedObjectModel: Self.testModel)
-        try! coordinator.addPersistentStore(
-            ofType: NSInMemoryStoreType, configurationName: nil, at: nil
-        )
-        context = NSManagedObjectContext(.mainQueue)
-        context.persistentStoreCoordinator = coordinator
+        let model = CoreDataStack.createManagedObjectModel()
+        container = NSPersistentContainer(name: "EditHistoryTest", managedObjectModel: model)
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        container.persistentStoreDescriptions = [description]
+        container.loadPersistentStores { _, error in
+            if let error { fatalError("Test store failed: \(error)") }
+        }
+        context = container.viewContext
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         let fileStore = FileStore()
         repository = SessionRepository(context: context, fileStore: fileStore)
     }
 
     override func tearDown() {
-        // Remove store to prevent Core Data state leaking into subsequent test suites.
-        for store in coordinator?.persistentStores ?? [] {
-            try? coordinator.remove(store)
-        }
+        context?.reset()
         repository = nil
         context = nil
-        coordinator = nil
+        container = nil
         super.tearDown()
     }
 

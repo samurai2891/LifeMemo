@@ -1,7 +1,7 @@
 import Foundation
 import os.log
 
-/// Benchmarks on-device summarization performance across different text sizes.
+/// Benchmarks on-device summarization performance across different text sizes and algorithms.
 /// Measures latency, memory usage, and thermal state.
 @MainActor
 final class SummarizationBenchmark: ObservableObject {
@@ -10,6 +10,7 @@ final class SummarizationBenchmark: ObservableObject {
 
     struct BenchmarkResult: Identifiable, Equatable {
         let id: UUID
+        let algorithm: SummarizationAlgorithm
         let inputSize: InputSize
         let wordCount: Int
         let processingTimeMs: Double
@@ -55,39 +56,53 @@ final class SummarizationBenchmark: ObservableObject {
 
     // MARK: - Public API
 
-    /// Runs benchmarks for all input sizes sequentially.
+    /// Runs benchmarks for all input sizes and algorithms sequentially.
     func runAll() async {
         isRunning = true
         results = []
 
-        for size in InputSize.allCases {
-            currentTest = "Testing \(size.rawValue)..."
-            let result = await runSingle(size: size)
-            results.append(result)
-            logger.info(
-                "Benchmark \(size.rawValue): \(result.processingTimeMs, format: .fixed(precision: 1))ms, \(result.wordsPerSecond, format: .fixed(precision: 0)) words/sec"
-            )
+        for algorithm in SummarizationAlgorithm.allCases {
+            for size in InputSize.allCases {
+                currentTest = "Testing \(algorithm.displayName) \(size.rawValue)..."
+                let result = await runSingle(size: size, algorithm: algorithm)
+                results.append(result)
+                logger.info(
+                    "Benchmark \(algorithm.displayName) \(size.rawValue): \(result.processingTimeMs, format: .fixed(precision: 1))ms, \(result.wordsPerSecond, format: .fixed(precision: 0)) words/sec"
+                )
+            }
         }
 
         currentTest = ""
         isRunning = false
     }
 
-    /// Run benchmark for a single input size.
-    func runSingle(size: InputSize) async -> BenchmarkResult {
+    /// Run benchmark for a single algorithm and input size.
+    func runSingle(size: InputSize, algorithm: SummarizationAlgorithm = .tfidf) async -> BenchmarkResult {
         let text = generateTestText(wordCount: size.approximateWordCount)
         let memBefore = currentMemoryMB()
         let thermal = thermalStateString()
 
-        let summarizer = NLExtractiveSummarizer()
         let start = CFAbsoluteTimeGetCurrent()
-        let summaryResult = summarizer.summarize(text: text)
-        let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000.0
+        let summaryResult: SummarizationResult
 
+        switch algorithm {
+        case .tfidf:
+            let summarizer = NLExtractiveSummarizer()
+            summaryResult = summarizer.summarize(text: text)
+        case .textRank:
+            let summarizer = TextRankSummarizer()
+            summaryResult = summarizer.summarize(text: text)
+        case .leadBased:
+            let summarizer = LeadSummarizer()
+            summaryResult = summarizer.summarize(text: text)
+        }
+
+        let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000.0
         let memAfter = currentMemoryMB()
 
         return BenchmarkResult(
             id: UUID(),
+            algorithm: algorithm,
             inputSize: size,
             wordCount: summaryResult.inputWordCount,
             processingTimeMs: elapsed,

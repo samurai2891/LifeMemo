@@ -2,6 +2,8 @@ import Foundation
 
 /// Result of on-device extractive summarization.
 struct SummarizationResult: Equatable {
+    /// The algorithm that produced this result.
+    let algorithm: SummarizationAlgorithm
     /// Top extracted sentences ranked by importance.
     let sentences: [RankedSentence]
     /// Extracted keywords (nouns + named entities) sorted by frequency.

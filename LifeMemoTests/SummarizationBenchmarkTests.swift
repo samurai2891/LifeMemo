@@ -22,18 +22,34 @@ final class SummarizationBenchmarkTests: XCTestCase {
         XCTAssertEqual(SummarizationBenchmark.InputSize.allCases.count, 4)
     }
 
-    func testRunSingleSmall() async {
+    func testRunSingleSmallTFIDF() async {
         let benchmark = SummarizationBenchmark()
-        let result = await benchmark.runSingle(size: .small)
+        let result = await benchmark.runSingle(size: .small, algorithm: .tfidf)
         XCTAssertGreaterThan(result.wordCount, 0)
         XCTAssertGreaterThan(result.processingTimeMs, 0)
         XCTAssertGreaterThan(result.sentenceCount, 0)
         XCTAssertFalse(result.thermalState.isEmpty)
+        XCTAssertEqual(result.algorithm, .tfidf)
+    }
+
+    func testRunSingleSmallTextRank() async {
+        let benchmark = SummarizationBenchmark()
+        let result = await benchmark.runSingle(size: .small, algorithm: .textRank)
+        XCTAssertGreaterThan(result.wordCount, 0)
+        XCTAssertEqual(result.algorithm, .textRank)
+    }
+
+    func testRunSingleSmallLeadBased() async {
+        let benchmark = SummarizationBenchmark()
+        let result = await benchmark.runSingle(size: .small, algorithm: .leadBased)
+        XCTAssertGreaterThan(result.wordCount, 0)
+        XCTAssertEqual(result.algorithm, .leadBased)
     }
 
     func testWordsPerSecond() {
         let result = SummarizationBenchmark.BenchmarkResult(
             id: UUID(),
+            algorithm: .tfidf,
             inputSize: .small,
             wordCount: 1000,
             processingTimeMs: 500,
@@ -43,12 +59,13 @@ final class SummarizationBenchmarkTests: XCTestCase {
             keywordCount: 10,
             timestamp: Date()
         )
-        XCTAssertEqual(result.wordsPerSecond, 2000, accuracy: 0.1) // 1000 words / 0.5 sec
+        XCTAssertEqual(result.wordsPerSecond, 2000, accuracy: 0.1)
     }
 
     func testWordsPerSecondZeroDuration() {
         let result = SummarizationBenchmark.BenchmarkResult(
             id: UUID(),
+            algorithm: .tfidf,
             inputSize: .small,
             wordCount: 100,
             processingTimeMs: 0,
@@ -59,5 +76,11 @@ final class SummarizationBenchmarkTests: XCTestCase {
             timestamp: Date()
         )
         XCTAssertEqual(result.wordsPerSecond, 0)
+    }
+
+    func testDefaultAlgorithmIsTFIDF() async {
+        let benchmark = SummarizationBenchmark()
+        let result = await benchmark.runSingle(size: .small)
+        XCTAssertEqual(result.algorithm, .tfidf)
     }
 }
