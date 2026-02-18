@@ -105,13 +105,14 @@ final class AudioInterruptionHandler: ObservableObject {
 
         switch reason {
         case .oldDeviceUnavailable:
-            // Headset unplugged - recording continues with built-in mic
-            break
+            // Headset unplugged - explicitly fall back to built-in mic
+            let session = AVAudioSession.sharedInstance()
+            if let builtIn = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
+                try? session.setPreferredInput(builtIn)
+            }
         case .newDeviceAvailable:
-            // New device connected - recording continues
             break
         case .categoryChange:
-            // Another app changed the category
             break
         default:
             break
@@ -121,7 +122,15 @@ final class AudioInterruptionHandler: ObservableObject {
     private func handleMediaServicesReset() {
         // Media services were reset entirely - need full re-initialization
         interruptionState = .none
-        onRecoveryFailed?("Media services were reset. Please restart recording.")
+        recoveryAttempts = 0
+        // Notify that a full restart is needed
+        onShouldPause?()
+
+        // Delay to allow system to stabilize, then attempt restart
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            onShouldResume?()
+        }
     }
 
     // MARK: - Recovery

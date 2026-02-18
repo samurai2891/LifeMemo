@@ -12,13 +12,39 @@ final class CoreDataStack {
     init(modelName: String) {
         let model = Self.createManagedObjectModel()
         container = NSPersistentContainer(name: modelName, managedObjectModel: model)
-        container.loadPersistentStores { _, error in
+
+        // Custom store URL in Application Support
+        if let description = container.persistentStoreDescriptions.first {
+            let storeURL = Self.storeURL()
+            description.url = storeURL
+            description.shouldMigrateStoreAutomatically = true
+            description.shouldInferMappingModelAutomatically = true
+        }
+
+        container.loadPersistentStores { description, error in
             if let error = error {
                 fatalError("Core Data failed to load: \(error.localizedDescription)")
+            }
+            // Set database file protection
+            if let url = description.url {
+                try? FileManager.default.setAttributes(
+                    [.protectionKey: FileProtectionType.completeUnlessOpen],
+                    ofItemAtPath: url.path
+                )
             }
         }
         container.viewContext.automaticallyMergesChangesFromParent = true
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+    }
+
+    static func storeURL() -> URL {
+        let fm = FileManager.default
+        let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let coreDataDir = appSupport
+            .appendingPathComponent("LifeMemo", isDirectory: true)
+            .appendingPathComponent("CoreData", isDirectory: true)
+        try? fm.createDirectory(at: coreDataDir, withIntermediateDirectories: true)
+        return coreDataDir.appendingPathComponent("LifeMemo.sqlite")
     }
 
     // MARK: - Programmatic Model
@@ -30,15 +56,22 @@ final class CoreDataStack {
         let chunkEntity = makeChunkEntity()
         let segmentEntity = makeSegmentEntity()
         let highlightEntity = makeHighlightEntity()
+        let tagEntity = makeTagEntity()
+        let folderEntity = makeFolderEntity()
 
         configureRelationships(
             session: sessionEntity,
             chunk: chunkEntity,
             segment: segmentEntity,
-            highlight: highlightEntity
+            highlight: highlightEntity,
+            tag: tagEntity,
+            folder: folderEntity
         )
 
-        model.entities = [sessionEntity, chunkEntity, segmentEntity, highlightEntity]
+        model.entities = [
+            sessionEntity, chunkEntity, segmentEntity,
+            highlightEntity, tagEntity, folderEntity
+        ]
         return model
     }
 
@@ -101,10 +134,31 @@ final class CoreDataStack {
         summary.attributeType = .stringAttributeType
         summary.isOptional = true
 
+        let bodyText = NSAttributeDescription()
+        bodyText.name = "bodyText"
+        bodyText.attributeType = .stringAttributeType
+        bodyText.isOptional = true
+
+        let latitude = NSAttributeDescription()
+        latitude.name = "latitude"
+        latitude.attributeType = .doubleAttributeType
+        latitude.defaultValue = Double(0)
+
+        let longitude = NSAttributeDescription()
+        longitude.name = "longitude"
+        longitude.attributeType = .doubleAttributeType
+        longitude.defaultValue = Double(0)
+
+        let placeName = NSAttributeDescription()
+        placeName.name = "placeName"
+        placeName.attributeType = .stringAttributeType
+        placeName.isOptional = true
+
         entity.properties = [
             id, createdAt, startedAt, endedAt,
             title, languageModeRaw, statusRaw,
-            audioKept, summary
+            audioKept, summary, bodyText,
+            latitude, longitude, placeName
         ]
         return entity
     }
@@ -193,7 +247,17 @@ final class CoreDataStack {
         createdAt.name = "createdAt"
         createdAt.attributeType = .dateAttributeType
 
-        entity.properties = [id, startMs, endMs, text, createdAt]
+        let isUserEdited = NSAttributeDescription()
+        isUserEdited.name = "isUserEdited"
+        isUserEdited.attributeType = .booleanAttributeType
+        isUserEdited.defaultValue = false
+
+        let originalText = NSAttributeDescription()
+        originalText.name = "originalText"
+        originalText.attributeType = .stringAttributeType
+        originalText.isOptional = true
+
+        entity.properties = [id, startMs, endMs, text, createdAt, isUserEdited, originalText]
         return entity
     }
 
@@ -224,13 +288,69 @@ final class CoreDataStack {
         return entity
     }
 
+    private static func makeTagEntity() -> NSEntityDescription {
+        let entity = NSEntityDescription()
+        entity.name = "TagEntity"
+        entity.managedObjectClassName = "TagEntity"
+
+        let id = NSAttributeDescription()
+        id.name = "id"
+        id.attributeType = .UUIDAttributeType
+
+        let name = NSAttributeDescription()
+        name.name = "name"
+        name.attributeType = .stringAttributeType
+        name.defaultValue = ""
+
+        let colorHex = NSAttributeDescription()
+        colorHex.name = "colorHex"
+        colorHex.attributeType = .stringAttributeType
+        colorHex.isOptional = true
+
+        let createdAt = NSAttributeDescription()
+        createdAt.name = "createdAt"
+        createdAt.attributeType = .dateAttributeType
+
+        entity.properties = [id, name, colorHex, createdAt]
+        return entity
+    }
+
+    private static func makeFolderEntity() -> NSEntityDescription {
+        let entity = NSEntityDescription()
+        entity.name = "FolderEntity"
+        entity.managedObjectClassName = "FolderEntity"
+
+        let id = NSAttributeDescription()
+        id.name = "id"
+        id.attributeType = .UUIDAttributeType
+
+        let name = NSAttributeDescription()
+        name.name = "name"
+        name.attributeType = .stringAttributeType
+        name.defaultValue = ""
+
+        let sortOrder = NSAttributeDescription()
+        sortOrder.name = "sortOrder"
+        sortOrder.attributeType = .integer32AttributeType
+        sortOrder.defaultValue = Int32(0)
+
+        let createdAt = NSAttributeDescription()
+        createdAt.name = "createdAt"
+        createdAt.attributeType = .dateAttributeType
+
+        entity.properties = [id, name, sortOrder, createdAt]
+        return entity
+    }
+
     // MARK: - Relationships
 
     private static func configureRelationships(
         session: NSEntityDescription,
         chunk: NSEntityDescription,
         segment: NSEntityDescription,
-        highlight: NSEntityDescription
+        highlight: NSEntityDescription,
+        tag: NSEntityDescription,
+        folder: NSEntityDescription
     ) {
         // Session <-> Chunks (one-to-many, cascade)
         let sessionToChunks = NSRelationshipDescription()
@@ -297,10 +417,48 @@ final class CoreDataStack {
         sessionToHighlights.inverseRelationship = highlightToSession
         highlightToSession.inverseRelationship = sessionToHighlights
 
+        // Session <-> Tags (many-to-many)
+        let sessionToTags = NSRelationshipDescription()
+        sessionToTags.name = "tags"
+        sessionToTags.destinationEntity = tag
+        sessionToTags.deleteRule = .nullifyDeleteRule
+        sessionToTags.isOptional = true
+
+        let tagToSessions = NSRelationshipDescription()
+        tagToSessions.name = "sessions"
+        tagToSessions.destinationEntity = session
+        tagToSessions.deleteRule = .nullifyDeleteRule
+        tagToSessions.isOptional = true
+
+        sessionToTags.inverseRelationship = tagToSessions
+        tagToSessions.inverseRelationship = sessionToTags
+
+        // Session <-> Folder (many-to-one)
+        let sessionToFolder = NSRelationshipDescription()
+        sessionToFolder.name = "folder"
+        sessionToFolder.destinationEntity = folder
+        sessionToFolder.deleteRule = .nullifyDeleteRule
+        sessionToFolder.maxCount = 1
+        sessionToFolder.isOptional = true
+
+        let folderToSessions = NSRelationshipDescription()
+        folderToSessions.name = "sessions"
+        folderToSessions.destinationEntity = session
+        folderToSessions.deleteRule = .nullifyDeleteRule
+        folderToSessions.isOptional = true
+
+        sessionToFolder.inverseRelationship = folderToSessions
+        folderToSessions.inverseRelationship = sessionToFolder
+
         // Append relationship properties to entities
-        session.properties += [sessionToChunks, sessionToSegments, sessionToHighlights]
+        session.properties += [
+            sessionToChunks, sessionToSegments, sessionToHighlights,
+            sessionToTags, sessionToFolder
+        ]
         chunk.properties += [chunkToSession, chunkToSegments]
         segment.properties += [segmentToSession, segmentToChunk]
         highlight.properties += [highlightToSession]
+        tag.properties += [tagToSessions]
+        folder.properties += [folderToSessions]
     }
 }

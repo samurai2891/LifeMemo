@@ -26,11 +26,11 @@ final class FTS5Manager {
     )
 
     init() {
-        let documentsPath = FileManager.default.urls(
-            for: .documentDirectory,
+        let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
             in: .userDomainMask
         ).first!
-        let ftsDir = documentsPath.appendingPathComponent("AppData/FTS", isDirectory: true)
+        let ftsDir = appSupport.appendingPathComponent("LifeMemo/FTS", isDirectory: true)
         try? FileManager.default.createDirectory(at: ftsDir, withIntermediateDirectories: true)
         self.dbPath = ftsDir.appendingPathComponent("search_index.sqlite").path
 

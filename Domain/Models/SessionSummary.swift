@@ -12,4 +12,8 @@ struct SessionSummary: Identifiable {
     let summary: String?
     let chunkCount: Int
     let transcriptPreview: String?
+    let bodyText: String?
+    let tags: [TagInfo]
+    let folderName: String?
+    let placeName: String?
 }

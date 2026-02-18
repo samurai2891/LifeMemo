@@ -9,6 +9,7 @@ struct SearchResult: Identifiable {
     let sessionTitle: String
 }
 
+@MainActor
 protocol SearchServiceProtocol: AnyObject {
     func search(query: String) -> [SearchResult]
     func searchSessions(query: String) -> [UUID]

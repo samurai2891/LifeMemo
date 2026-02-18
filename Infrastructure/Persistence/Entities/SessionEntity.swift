@@ -12,9 +12,15 @@ public class SessionEntity: NSManagedObject {
     @NSManaged public var statusRaw: Int16
     @NSManaged public var audioKept: Bool
     @NSManaged public var summary: String?
+    @NSManaged public var bodyText: String?
+    @NSManaged public var latitude: Double
+    @NSManaged public var longitude: Double
+    @NSManaged public var placeName: String?
     @NSManaged public var chunks: NSSet?
     @NSManaged public var segments: NSSet?
     @NSManaged public var highlights: NSSet?
+    @NSManaged public var tags: NSSet?
+    @NSManaged public var folder: FolderEntity?
 }
 
 extension SessionEntity {
@@ -44,6 +50,15 @@ extension SessionEntity {
         return set.sorted { $0.atMs < $1.atMs }
     }
 
+    var tagsArray: [TagEntity] {
+        let set = tags as? Set<TagEntity> ?? []
+        return set.sorted { ($0.name ?? "") < ($1.name ?? "") }
+    }
+
+    var hasLocation: Bool {
+        latitude != 0 || longitude != 0
+    }
+
     func toSummary() -> SessionSummary {
         let preview = segmentsArray
             .prefix(3)
@@ -61,7 +76,11 @@ extension SessionEntity {
             languageMode: languageModeRaw ?? "auto",
             summary: summary,
             chunkCount: chunksArray.count,
-            transcriptPreview: preview.isEmpty ? nil : String(preview.prefix(200))
+            transcriptPreview: preview.isEmpty ? nil : String(preview.prefix(200)),
+            bodyText: bodyText,
+            tags: tagsArray.map { $0.toInfo() },
+            folderName: folder?.name,
+            placeName: placeName
         )
     }
 }

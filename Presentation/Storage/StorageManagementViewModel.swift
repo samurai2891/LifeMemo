@@ -3,9 +3,8 @@ import Combine
 
 /// ViewModel for the StorageManagementView.
 ///
-/// Wraps StorageManager and CloudSyncManager to provide a unified interface
-/// for storage visualization, cleanup operations, backup management,
-/// and iCloud sync control.
+/// Wraps StorageManager to provide a unified interface
+/// for storage visualization, cleanup operations, and backup management.
 @MainActor
 final class StorageManagementViewModel: ObservableObject {
 
@@ -36,7 +35,6 @@ final class StorageManagementViewModel: ObservableObject {
         case backupSuccess(URL)
         case backupError(String)
         case cleanupResult(Int)
-        case iCloudUnavailable(String)
 
         var id: String {
             switch self {
@@ -46,29 +44,49 @@ final class StorageManagementViewModel: ObservableObject {
             case .backupSuccess: return "backupSuccess"
             case .backupError: return "backupError"
             case .cleanupResult: return "cleanupResult"
-            case .iCloudUnavailable: return "iCloudUnavailable"
             }
         }
     }
+
+    // MARK: - Constants
+
+    private static let storageLimitGBKey = "storageLimitGB"
+    private static let autoDeleteEnabledKey = "autoDeleteEnabled"
+    private static let defaultStorageLimitGB = 10
 
     // MARK: - Published State
 
     @Published var selectedCleanupPeriod: CleanupPeriod = .thirtyDays
     @Published var activeAlert: AlertType?
     @Published private(set) var isCreatingBackup = false
-    @Published private(set) var iCloudStatusText: String = ""
+
+    @Published var storageLimitGB: Int {
+        didSet {
+            guard oldValue != storageLimitGB else { return }
+            UserDefaults.standard.set(storageLimitGB, forKey: Self.storageLimitGBKey)
+        }
+    }
+
+    @Published var autoDeleteEnabled: Bool {
+        didSet {
+            guard oldValue != autoDeleteEnabled else { return }
+            UserDefaults.standard.set(autoDeleteEnabled, forKey: Self.autoDeleteEnabledKey)
+        }
+    }
 
     // MARK: - Dependencies
 
     let storageManager: StorageManager
-    let cloudSyncManager: CloudSyncManager
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
 
-    init(storageManager: StorageManager, cloudSyncManager: CloudSyncManager) {
+    init(storageManager: StorageManager) {
         self.storageManager = storageManager
-        self.cloudSyncManager = cloudSyncManager
+
+        let savedLimit = UserDefaults.standard.integer(forKey: Self.storageLimitGBKey)
+        self.storageLimitGB = savedLimit > 0 ? savedLimit : Self.defaultStorageLimitGB
+        self.autoDeleteEnabled = UserDefaults.standard.bool(forKey: Self.autoDeleteEnabledKey)
     }
 
     // MARK: - Storage
@@ -95,43 +113,6 @@ final class StorageManagementViewModel: ObservableObject {
 
     func loadStorage() {
         storageManager.calculateStorage()
-    }
-
-    // MARK: - iCloud Sync
-
-    var isSyncEnabled: Bool {
-        get { cloudSyncManager.isSyncEnabled }
-        set { cloudSyncManager.isSyncEnabled = newValue }
-    }
-
-    var syncState: CloudSyncManager.SyncState {
-        cloudSyncManager.syncState
-    }
-
-    var lastSyncDisplayText: String {
-        cloudSyncManager.lastSyncDisplayText
-    }
-
-    func toggleSync(enabled: Bool) {
-        Task {
-            if enabled {
-                let available = await cloudSyncManager.checkiCloudAvailability()
-                if available {
-                    cloudSyncManager.isSyncEnabled = true
-                } else {
-                    let statusText = await cloudSyncManager.iCloudStatusDescription()
-                    activeAlert = .iCloudUnavailable(statusText)
-                }
-            } else {
-                cloudSyncManager.isSyncEnabled = false
-            }
-        }
-    }
-
-    func refreshiCloudStatus() {
-        Task {
-            iCloudStatusText = await cloudSyncManager.iCloudStatusDescription()
-        }
     }
 
     // MARK: - Audio Cleanup

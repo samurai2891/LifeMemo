@@ -15,42 +15,47 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
         let chunkSeconds: TimeInterval
         let sampleRate: Double
         let channels: Int
+        let bitRate: Int
 
         static let `default` = Config(
             chunkSeconds: 60,
             sampleRate: 16_000,
-            channels: 1
+            channels: 1,
+            bitRate: 64_000
         )
     }
 
     // MARK: - Dependencies
 
-    private let config: Config
     private let repository: SessionRepository
     private let fileStore: FileStore
     private let transcriptionQueue: TranscriptionQueueActor
+
+    // MARK: - Metering
+
+    weak var meterCollector: AudioMeterCollector?
 
     // MARK: - Internal State
 
     private var recorder: AVAudioRecorder?
     private var timer: DispatchSourceTimer?
+    private var meterTimer: DispatchSourceTimer?
     private var sessionId: UUID?
     private var chunkIndex: Int = 0
     private var currentChunkId: UUID?
     private var currentLanguage: LanguageMode = .auto
+    private var activeConfig: Config = .default
 
     // MARK: - Initializer
 
     init(
         repository: SessionRepository,
         fileStore: FileStore,
-        transcriptionQueue: TranscriptionQueueActor,
-        config: Config = .default
+        transcriptionQueue: TranscriptionQueueActor
     ) {
         self.repository = repository
         self.fileStore = fileStore
         self.transcriptionQueue = transcriptionQueue
-        self.config = config
     }
 
     // MARK: - Public API
@@ -61,17 +66,20 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
     ///   - sessionId: The session identifier to associate chunks with.
     ///   - languageMode: The language for downstream transcription.
     /// - Throws: An error if the first chunk cannot be started.
-    func start(sessionId: UUID, languageMode: LanguageMode) throws {
+    func start(sessionId: UUID, languageMode: LanguageMode, config: Config? = nil) throws {
         self.sessionId = sessionId
         self.chunkIndex = 0
         self.currentLanguage = languageMode
+        self.activeConfig = config ?? .default
         try startNewChunk(sessionId: sessionId)
         startRotationTimer()
+        startMeterTimer()
     }
 
     /// Stops recording, finalizes the current chunk, and cleans up timers.
     func stop() async {
         cancelTimer()
+        stopMeterTimer()
         await finalizeCurrentChunk()
         recorder = nil
         sessionId = nil
@@ -82,8 +90,8 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
     private func startRotationTimer() {
         let source = DispatchSource.makeTimerSource(queue: .global(qos: .userInitiated))
         source.schedule(
-            deadline: .now() + config.chunkSeconds,
-            repeating: config.chunkSeconds
+            deadline: .now() + activeConfig.chunkSeconds,
+            repeating: activeConfig.chunkSeconds
         )
         source.setEventHandler { [weak self] in
             Task { @MainActor in
@@ -127,14 +135,15 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
 
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: config.sampleRate,
-            AVNumberOfChannelsKey: config.channels,
+            AVSampleRateKey: activeConfig.sampleRate,
+            AVNumberOfChannelsKey: activeConfig.channels,
+            AVEncoderBitRateKey: activeConfig.bitRate,
             AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue
         ]
 
         let audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
         audioRecorder.delegate = self
-        audioRecorder.isMeteringEnabled = false
+        audioRecorder.isMeteringEnabled = true
         audioRecorder.record()
 
         recorder = audioRecorder
@@ -169,6 +178,33 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
         )
 
         await transcriptionQueue.enqueue(chunkId: chunkId, sessionId: sid)
+    }
+
+    // MARK: - Metering Timer
+
+    private func startMeterTimer() {
+        let source = DispatchSource.makeTimerSource(queue: .global(qos: .userInitiated))
+        source.schedule(deadline: .now(), repeating: 0.1)
+        source.setEventHandler { [weak self] in
+            Task { @MainActor in
+                self?.updateMeterLevels()
+            }
+        }
+        source.resume()
+        meterTimer = source
+    }
+
+    private func stopMeterTimer() {
+        meterTimer?.cancel()
+        meterTimer = nil
+    }
+
+    private func updateMeterLevels() {
+        guard let rec = recorder else { return }
+        rec.updateMeters()
+        let avg = rec.averagePower(forChannel: 0)
+        let peak = rec.peakPower(forChannel: 0)
+        meterCollector?.update(averagePower: avg, peakPower: peak)
     }
 
     // MARK: - Helpers

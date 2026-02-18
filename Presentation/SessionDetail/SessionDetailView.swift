@@ -79,6 +79,24 @@ struct SessionDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $viewModel.showTagPicker, onDismiss: {
+            viewModel.loadSession()
+        }) {
+            TagPickerView(
+                sessionId: viewModel.sessionId,
+                repository: viewModel.repository,
+                sessionTags: viewModel.tags
+            )
+        }
+        .sheet(isPresented: $viewModel.showFolderPicker, onDismiss: {
+            viewModel.loadSession()
+        }) {
+            FolderPickerView(
+                sessionId: viewModel.sessionId,
+                currentFolderId: viewModel.currentFolderId,
+                repository: viewModel.repository
+            )
+        }
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") { viewModel.errorMessage = nil }
         } message: {
@@ -126,8 +144,23 @@ struct SessionDetailView: View {
 
                 Divider()
 
+                // Tags
+                tagsSection
+
+                Divider()
+
+                // Folder
+                folderSection
+
+                Divider()
+
                 // Summary section
                 summarySection(session)
+
+                Divider()
+
+                // Body text / notes
+                bodyTextSection
 
                 Divider()
 
@@ -142,8 +175,8 @@ struct SessionDetailView: View {
                     Divider()
                 }
 
-                // Full transcript
-                transcriptSection
+                // Transcript segments
+                segmentTranscriptSection
 
                 Divider()
 
@@ -210,6 +243,74 @@ struct SessionDetailView: View {
         }
     }
 
+    // MARK: - Tags Section
+
+    private var tagsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Tags", systemImage: "tag")
+                    .font(.headline)
+
+                Spacer()
+
+                Button {
+                    viewModel.showTagPicker = true
+                } label: {
+                    Image(systemName: "plus.circle")
+                        .font(.title3)
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+
+            if viewModel.tags.isEmpty {
+                Text("No tags assigned.")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+                    .italic()
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(viewModel.tags) { tag in
+                            TagChipView(tag: tag) {
+                                viewModel.removeTag(tag)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Folder Section
+
+    private var folderSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Folder", systemImage: "folder")
+                    .font(.headline)
+
+                Spacer()
+
+                Button {
+                    viewModel.showFolderPicker = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(viewModel.folderName ?? "No Folder")
+                            .font(.subheadline)
+                            .foregroundStyle(
+                                viewModel.folderName != nil ? .primary : .tertiary
+                            )
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     // MARK: - Summary Section
 
     @ViewBuilder
@@ -248,6 +349,70 @@ struct SessionDetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(.tertiary)
                     .italic()
+            }
+        }
+    }
+
+    // MARK: - Body Text Section
+
+    private var bodyTextSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Notes", systemImage: "note.text")
+                    .font(.headline)
+
+                Spacer()
+
+                if !viewModel.isEditingBodyText {
+                    Button {
+                        viewModel.isEditingBodyText = true
+                    } label: {
+                        Text("Edit")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+
+            if viewModel.isEditingBodyText {
+                TextEditor(text: $viewModel.bodyText)
+                    .font(.subheadline)
+                    .frame(minHeight: 100, maxHeight: 200)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color(.separator), lineWidth: 1)
+                    )
+
+                HStack(spacing: 12) {
+                    Button("Cancel") {
+                        viewModel.cancelBodyTextEdit()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Button("Save") {
+                        viewModel.saveBodyText()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            } else {
+                let displayText = viewModel.bodyText
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                if displayText.isEmpty {
+                    Text("No notes yet. Tap Edit to add some.")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                        .italic()
+                } else {
+                    Text(displayText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineSpacing(4)
+                }
             }
         }
     }
@@ -343,26 +508,114 @@ struct SessionDetailView: View {
         }
     }
 
-    // MARK: - Transcript Section
+    // MARK: - Segment Transcript Section
 
-    private var transcriptSection: some View {
+    private var segmentTranscriptSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Full Transcript", systemImage: "text.alignleft")
+            Label("Transcript", systemImage: "text.alignleft")
                 .font(.headline)
 
-            if viewModel.transcript.isEmpty {
+            if viewModel.segments.isEmpty {
                 Text("No transcript available yet.")
                     .font(.subheadline)
                     .foregroundStyle(.tertiary)
                     .italic()
             } else {
-                Text(viewModel.transcript)
+                LazyVStack(spacing: 8) {
+                    ForEach(viewModel.segments) { segment in
+                        segmentRow(segment)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func segmentRow(_ segment: SegmentDisplayInfo) -> some View {
+        let isEditing = viewModel.editingSegmentId == segment.id
+
+        VStack(alignment: .leading, spacing: 6) {
+            // Timestamp and badges
+            HStack(spacing: 8) {
+                Text(formatMs(segment.startMs))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(Color.accentColor)
+
+                if segment.isUserEdited {
+                    Text("edited")
+                        .font(.system(size: 9, weight: .semibold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.15))
+                        .foregroundStyle(.orange)
+                        .clipShape(Capsule())
+                }
+
+                Spacer()
+
+                if !isEditing {
+                    Button {
+                        viewModel.beginSegmentEdit(segment)
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // Content: editing or display
+            if isEditing {
+                TextEditor(text: $viewModel.editingSegmentText)
+                    .font(.subheadline)
+                    .frame(minHeight: 60, maxHeight: 150)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color(.separator), lineWidth: 1)
+                    )
+
+                HStack(spacing: 12) {
+                    Button("Cancel") {
+                        viewModel.cancelSegmentEdit()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Button("Save") {
+                        viewModel.saveSegmentEdit()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            } else {
+                Text(segment.text)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
-                    .lineSpacing(4)
+                    .lineSpacing(3)
+            }
+
+            // Show original text button for edited segments
+            if segment.isUserEdited,
+               let original = segment.originalText,
+               !isEditing {
+                DisclosureGroup {
+                    Text(original)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .textSelection(.enabled)
+                        .lineSpacing(2)
+                } label: {
+                    Text("Show original")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
+        .padding(10)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     // MARK: - Chunk Status Section

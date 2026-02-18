@@ -44,6 +44,14 @@ final class EnhancedExportService {
         case .pdf:
             let data = PDFExporter.make(model: model, options: options)
             return try writePDFExport(data: data, suggestedName: model.safeFileName)
+
+        case .json:
+            let text = JSONExporter.make(model: model, options: options)
+            return try fileStore.writeExport(
+                text: text,
+                ext: "json",
+                suggestedName: model.safeFileName
+            )
         }
     }
 
@@ -79,7 +87,22 @@ enum FilteredMarkdownExporter {
                 md += "- **Ended**: \(formatter.string(from: ended))\n"
             }
             md += "- **Language**: \(model.languageMode)\n"
-            md += "- **Audio**: \(model.audioKept ? "kept" : "deleted")\n\n"
+            md += "- **Audio**: \(model.audioKept ? "kept" : "deleted")\n"
+            if let folderName = model.folderName, !folderName.isEmpty {
+                md += "- **Folder**: \(folderName)\n"
+            }
+            if !model.tags.isEmpty {
+                md += "- **Tags**: \(model.tags.joined(separator: ", "))\n"
+            }
+            if let locationName = model.locationName, !locationName.isEmpty {
+                md += "- **Location**: \(locationName)\n"
+            }
+            md += "\n"
+        }
+
+        if let bodyText = model.bodyText, !bodyText.isEmpty {
+            md += "## Notes\n\n"
+            md += bodyText + "\n\n"
         }
 
         if options.includeSummary, let summary = model.summaryMarkdown, !summary.isEmpty {
@@ -132,6 +155,21 @@ enum FilteredTextExporter {
             }
             lines.append("Language: \(model.languageMode)")
             lines.append("Audio: \(model.audioKept ? "kept" : "deleted")")
+            if let folderName = model.folderName, !folderName.isEmpty {
+                lines.append("Folder: \(folderName)")
+            }
+            if !model.tags.isEmpty {
+                lines.append("Tags: \(model.tags.joined(separator: ", "))")
+            }
+            if let locationName = model.locationName, !locationName.isEmpty {
+                lines.append("Location: \(locationName)")
+            }
+            lines.append("")
+        }
+
+        if let bodyText = model.bodyText, !bodyText.isEmpty {
+            lines.append("--- Notes ---")
+            lines.append(bodyText)
             lines.append("")
         }
 

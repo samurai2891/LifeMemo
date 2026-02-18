@@ -19,15 +19,24 @@ struct SettingsView: View {
         )
     }
 
+    // MARK: - State
+
+    @State private var showLogShareSheet = false
+    @State private var logFileURL: URL?
+
     // MARK: - Body
 
     var body: some View {
         Form {
             languageSection
             audioQualitySection
+            summarizationSection
             permissionsSection
+            securitySection
             storageSection
+            locationSection
             privacySection
+            supportSection
             aboutSection
         }
         .navigationTitle("Settings")
@@ -35,6 +44,11 @@ struct SettingsView: View {
         .overlay { RecordingIndicatorOverlay() }
         .onAppear {
             viewModel.refreshPermissions()
+        }
+        .sheet(isPresented: $showLogShareSheet) {
+            if let logFileURL {
+                ShareSheet(activityItems: [logFileURL])
+            }
         }
     }
 
@@ -48,10 +62,20 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.menu)
+
+            if !viewModel.transcriptionCapability.isAvailable {
+                Label {
+                    Text(viewModel.transcriptionCapability.userMessage)
+                        .font(.caption)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+            }
         } header: {
             Text("Transcription")
         } footer: {
-            Text("Select the language for speech recognition. Auto will attempt to detect the language automatically.")
+            Text("Select the language for speech recognition. Only Japanese and English are supported for on-device transcription.")
         }
     }
 
@@ -132,20 +156,63 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Summarization Section
+
+    private var summarizationSection: some View {
+        Section {
+            NavigationLink {
+                BenchmarkResultsView(benchmark: container.summarizationBenchmark)
+            } label: {
+                Label("Run Benchmark", systemImage: "gauge.with.dots.needle.33percent")
+            }
+        } header: {
+            Text("Summarization")
+        } footer: {
+            Text("On-device extractive summarization using Apple NaturalLanguage. No data leaves your device.")
+        }
+    }
+
+    // MARK: - Security Section
+
+    private var securitySection: some View {
+        AppLockSettingView()
+    }
+
     // MARK: - Storage Section
 
     private var storageSection: some View {
         Section {
             NavigationLink {
                 StorageManagementView(
-                    storageManager: container.storageManager,
-                    cloudSyncManager: container.cloudSyncManager
+                    storageManager: container.storageManager
                 )
             } label: {
-                Label("Storage & Sync", systemImage: "externaldrive")
+                Label("Storage", systemImage: "externaldrive")
             }
         } header: {
             Text("Data")
+        }
+    }
+
+    // MARK: - Location Section
+
+    private var locationSection: some View {
+        Section {
+            Toggle(isOn: Binding(
+                get: { container.locationService.isEnabled },
+                set: { newValue in
+                    container.locationService.isEnabled = newValue
+                    if newValue {
+                        container.locationService.requestPermission()
+                    }
+                }
+            )) {
+                Label("Capture Location", systemImage: "location")
+            }
+        } header: {
+            Text("Location")
+        } footer: {
+            Text("When enabled, the approximate location will be saved when starting a recording. Location data stays on your device.")
         }
     }
 
@@ -180,6 +247,31 @@ struct SettingsView: View {
             }
         } header: {
             Text("Privacy")
+        }
+    }
+
+    // MARK: - Support Section
+
+    private var supportSection: some View {
+        Section {
+            Button {
+                exportLogs()
+            } label: {
+                Label("Export Logs", systemImage: "doc.text.magnifyingglass")
+            }
+        } header: {
+            Text("Support")
+        } footer: {
+            Text("Export diagnostic logs for troubleshooting. No personal data is included.")
+        }
+    }
+
+    private func exportLogs() {
+        do {
+            logFileURL = try container.logExporter.exportLogs()
+            showLogShareSheet = true
+        } catch {
+            // Silently fail - logging export failure is not critical
         }
     }
 
@@ -223,6 +315,74 @@ struct SettingsView: View {
     private func openAppSettings() {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
+    }
+}
+
+// MARK: - Share Sheet (UIKit bridge)
+
+private struct ShareSheet: UIViewControllerRepresentable {
+
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(
+        _ uiViewController: UIActivityViewController,
+        context: Context
+    ) {}
+}
+
+// MARK: - Benchmark Results View
+
+private struct BenchmarkResultsView: View {
+    @ObservedObject var benchmark: SummarizationBenchmark
+
+    var body: some View {
+        List {
+            if benchmark.isRunning {
+                HStack {
+                    ProgressView()
+                    Text(benchmark.currentTest)
+                        .font(.subheadline)
+                }
+            }
+
+            if !benchmark.isRunning && benchmark.results.isEmpty {
+                Button("Start Benchmark") {
+                    Task { await benchmark.runAll() }
+                }
+                .frame(maxWidth: .infinity)
+            }
+
+            ForEach(benchmark.results) { result in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(result.inputSize.rawValue)
+                        .font(.subheadline.bold())
+                    HStack(spacing: 16) {
+                        Label("\(String(format: "%.0f", result.processingTimeMs))ms", systemImage: "clock")
+                        Label("\(String(format: "%.0f", result.wordsPerSecond)) w/s", systemImage: "text.word.spacing")
+                        Label(result.thermalState, systemImage: "thermometer.medium")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .navigationTitle("Summarization Benchmark")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await benchmark.runAll() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .disabled(benchmark.isRunning)
+            }
+        }
     }
 }
 

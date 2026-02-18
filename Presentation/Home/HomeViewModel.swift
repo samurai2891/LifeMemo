@@ -12,8 +12,10 @@ final class HomeViewModel: ObservableObject {
     // MARK: - Published State
 
     @Published var searchQuery: String = ""
+    @Published var selectedFolderFilter: FolderInfo? = nil
     @Published private(set) var sessions: [SessionSummary] = []
     @Published private(set) var filteredSessions: [SessionSummary] = []
+    @Published private(set) var availableFolders: [FolderInfo] = []
     @Published private(set) var isLoading: Bool = false
 
     // MARK: - Dependencies
@@ -28,6 +30,7 @@ final class HomeViewModel: ObservableObject {
         self.repository = repository
         self.searchService = searchService
         setupSearchDebounce()
+        setupFolderFilterObserver()
     }
 
     // MARK: - Data Loading
@@ -36,8 +39,13 @@ final class HomeViewModel: ObservableObject {
         isLoading = true
         let entities = repository.fetchAllSessions()
         sessions = entities.map { $0.toSummary() }
+        loadFolders()
         applyFilter()
         isLoading = false
+    }
+
+    func loadFolders() {
+        availableFolders = repository.fetchAllFolders().map { $0.toInfo() }
     }
 
     func deleteSession(sessionId: UUID) {
@@ -58,22 +66,37 @@ final class HomeViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    private func setupFolderFilterObserver() {
+        $selectedFolderFilter
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                self?.applyFilter()
+            }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - Filtering
+
     private func applyFilter() {
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard !query.isEmpty else {
-            filteredSessions = sessions
-            return
+        var filtered = sessions
+
+        // Folder filter
+        if let folder = selectedFolderFilter {
+            filtered = filtered.filter { $0.folderName == folder.name }
         }
 
-        // Get session IDs matching the search from the search service
-        let matchingIds = Set(searchService.searchSessions(query: query))
-
-        // Also do local title matching for fast feedback
-        filteredSessions = sessions.filter { session in
-            matchingIds.contains(session.id)
-                || session.title.localizedCaseInsensitiveContains(query)
-                || (session.transcriptPreview?.localizedCaseInsensitiveContains(query) ?? false)
+        // Text search
+        if !query.isEmpty {
+            let matchingIds = Set(searchService.searchSessions(query: query))
+            filtered = filtered.filter { session in
+                matchingIds.contains(session.id)
+                    || session.title.localizedCaseInsensitiveContains(query)
+                    || (session.transcriptPreview?.localizedCaseInsensitiveContains(query) ?? false)
+            }
         }
+
+        filteredSessions = filtered
     }
 }

@@ -35,18 +35,55 @@ final class AppContainer: ObservableObject {
     let advancedSearch: AdvancedSearchService
     let paginatedLoader: PaginatedSessionLoader
 
-    // MARK: - Phase 2D: iCloud + Storage
+    // MARK: - Phase 2D: Storage
 
-    let cloudSyncManager: CloudSyncManager
     let storageManager: StorageManager
 
     // MARK: - Phase 2E: Enhanced Export
 
     let enhancedExportService: EnhancedExportService
 
+    // MARK: - v1.0: Audio Metering
+
+    let audioMeterCollector: AudioMeterCollector
+
+    // MARK: - v1.0: STT
+
+    let transcriptionCapabilityChecker: TranscriptionCapabilityChecker
+    let liveTranscriber: LiveTranscriber
+
+    // MARK: - v1.0: Security
+
+    let appLockManager: AppLockManager
+
+    // MARK: - v1.0: Backup
+
+    let backupService: BackupService
+
+    // MARK: - v1.0: Storage Limit
+
+    let storageLimitManager: StorageLimitManager
+
+    // MARK: - v1.0: Summarization
+
+    let nlSummarizer: NLExtractiveSummarizer
+    let topicExtractor: TopicExtractor
+    let summarizationBenchmark: SummarizationBenchmark
+
+    // MARK: - v1.0: Logging
+
+    let logExporter: AppLogExporter
+
+    // MARK: - v1.0: Location
+
+    let locationService: LocationService
+
     // MARK: - Init
 
     init() {
+        // Run storage migration BEFORE CoreData init
+        StorageMigrator.migrateIfNeeded()
+
         let coreData = CoreDataStack(modelName: "LifeMemo")
         let fileStore = FileStore()
         let repository = SessionRepository(context: coreData.viewContext, fileStore: fileStore)
@@ -70,11 +107,15 @@ final class AppContainer: ObservableObject {
         let audioSession = AudioSessionConfigurator()
         self.audioSession = audioSession
 
+        let audioMeterCollector = AudioMeterCollector()
+        self.audioMeterCollector = audioMeterCollector
+
         let chunkRecorder = ChunkedAudioRecorder(
             repository: repository,
             fileStore: fileStore,
             transcriptionQueue: transcriptionQueue
         )
+        chunkRecorder.meterCollector = audioMeterCollector
         self.chunkRecorder = chunkRecorder
 
         let audioInterruptionHandler = AudioInterruptionHandler()
@@ -94,7 +135,18 @@ final class AppContainer: ObservableObject {
             healthMonitor: recordingHealthMonitor
         )
 
-        self.summarizer = SimpleSummarizer(repository: repository)
+        // v1.0: Summarization
+        let nlSummarizer = NLExtractiveSummarizer()
+        self.nlSummarizer = nlSummarizer
+        let topicExtractor = TopicExtractor()
+        self.topicExtractor = topicExtractor
+        self.summarizationBenchmark = SummarizationBenchmark()
+
+        self.summarizer = SimpleSummarizer(
+            repository: repository,
+            extractiveSummarizer: nlSummarizer,
+            topicExtractor: topicExtractor
+        )
         self.search = SimpleSearchService(repository: repository)
         self.qna = SimpleQnAService(repository: repository)
         self.exportService = ExportService(
@@ -111,8 +163,7 @@ final class AppContainer: ObservableObject {
         )
         self.paginatedLoader = PaginatedSessionLoader(context: coreData.viewContext)
 
-        // Phase 2D: iCloud + Storage
-        self.cloudSyncManager = CloudSyncManager()
+        // Storage
         self.storageManager = StorageManager(
             fileStore: fileStore,
             repository: repository
@@ -124,9 +175,38 @@ final class AppContainer: ObservableObject {
             fileStore: fileStore
         )
 
+        // v1.0: STT
+        self.transcriptionCapabilityChecker = TranscriptionCapabilityChecker()
+        self.liveTranscriber = LiveTranscriber()
+
+        // v1.0: Security
+        self.appLockManager = AppLockManager()
+
+        // v1.0: Backup
+        self.backupService = BackupService(
+            repository: repository,
+            fileStore: fileStore
+        )
+
+        // v1.0: Storage Limit
+        let storageLimitManager = StorageLimitManager(
+            fileStore: fileStore,
+            repository: repository
+        )
+        self.storageLimitManager = storageLimitManager
+
+        // v1.0: Logging
+        self.logExporter = AppLogExporter()
+
+        // v1.0: Location
+        self.locationService = LocationService()
+
         // Wire memory pressure cleanup to Core Data
         memoryPressureMonitor.onShouldCleanup = { [weak coreData] in
             coreData?.viewContext.refreshAllObjects()
         }
+
+        // Check storage limits on launch
+        storageLimitManager.checkAndEnforce()
     }
 }

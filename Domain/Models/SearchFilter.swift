@@ -8,6 +8,8 @@ struct SearchFilter: Equatable {
     var languageMode: String?
     var hasAudio: Bool?
     var sortOrder: SortOrder = .newest
+    var tagName: String?
+    var folderName: String?
 
     enum SortOrder: String, CaseIterable, Identifiable {
         case newest = "newest"
@@ -32,9 +34,12 @@ struct SearchFilter: Equatable {
             && !highlightsOnly
             && languageMode == nil
             && hasAudio == nil
+            && tagName == nil
+            && folderName == nil
     }
 
     var hasActiveFilters: Bool {
         dateFrom != nil || dateTo != nil || highlightsOnly || languageMode != nil || hasAudio != nil
+            || tagName != nil || folderName != nil
     }
 }

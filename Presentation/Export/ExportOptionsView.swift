@@ -96,6 +96,8 @@ struct ExportOptionsView: View {
             return "Plain text format. Compatible with all text editors."
         case .pdf:
             return "Formatted document with typography. Ready to print or share."
+        case .json:
+            return "Structured data format. Ideal for programmatic access and data portability."
         }
     }
 

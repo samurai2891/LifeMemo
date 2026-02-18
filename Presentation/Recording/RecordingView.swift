@@ -23,7 +23,8 @@ struct RecordingView: View {
         _viewModel = StateObject(
             wrappedValue: RecordingViewModel(
                 coordinator: container.recordingCoordinator,
-                repository: container.repository
+                repository: container.repository,
+                meterCollector: container.chunkRecorder.meterCollector
             )
         )
     }
@@ -59,6 +60,13 @@ struct RecordingView: View {
                 waveformView
                     .frame(height: 80)
                     .padding(.horizontal, 32)
+
+                // Live transcript
+                if !viewModel.liveTranscriptText.isEmpty {
+                    liveTranscriptArea
+                        .frame(maxHeight: 120)
+                        .padding(.horizontal, 16)
+                }
 
                 // Chunk counter
                 chunkCounter
@@ -180,10 +188,24 @@ struct RecordingView: View {
                             endPoint: .top
                         )
                     )
-                    .frame(width: 4, height: max(4, level * 80))
+                    .frame(width: 4, height: max(4, CGFloat(level) * 80))
                     .animation(.easeOut(duration: 0.1), value: level)
             }
         }
+    }
+
+    // MARK: - Live Transcript
+
+    private var liveTranscriptArea: some View {
+        ScrollView {
+            Text(viewModel.liveTranscriptText)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+        }
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Chunk Counter

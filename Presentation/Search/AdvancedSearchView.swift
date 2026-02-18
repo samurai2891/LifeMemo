@@ -17,6 +17,8 @@ struct AdvancedSearchView: View {
     @State private var currentPage = 0
     @State private var hasMore = false
     @State private var totalCount = 0
+    @State private var availableTags: [TagInfo] = []
+    @State private var availableFolders: [FolderInfo] = []
 
     // MARK: - Body
 
@@ -62,15 +64,7 @@ struct AdvancedSearchView: View {
 
                 if !filter.query.isEmpty {
                     Button {
-                        filter = SearchFilter(
-                            query: "",
-                            dateFrom: filter.dateFrom,
-                            dateTo: filter.dateTo,
-                            highlightsOnly: filter.highlightsOnly,
-                            languageMode: filter.languageMode,
-                            hasAudio: filter.hasAudio,
-                            sortOrder: filter.sortOrder
-                        )
+                        filter.query = ""
                         results = []
                     } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -107,57 +101,37 @@ struct AdvancedSearchView: View {
             HStack(spacing: 8) {
                 if let from = filter.dateFrom {
                     filterChip("From: \(formatDate(from))") {
-                        filter = SearchFilter(
-                            query: filter.query,
-                            dateFrom: nil,
-                            dateTo: filter.dateTo,
-                            highlightsOnly: filter.highlightsOnly,
-                            languageMode: filter.languageMode,
-                            hasAudio: filter.hasAudio,
-                            sortOrder: filter.sortOrder
-                        )
+                        filter.dateFrom = nil
                         performSearch()
                     }
                 }
                 if let to = filter.dateTo {
                     filterChip("To: \(formatDate(to))") {
-                        filter = SearchFilter(
-                            query: filter.query,
-                            dateFrom: filter.dateFrom,
-                            dateTo: nil,
-                            highlightsOnly: filter.highlightsOnly,
-                            languageMode: filter.languageMode,
-                            hasAudio: filter.hasAudio,
-                            sortOrder: filter.sortOrder
-                        )
+                        filter.dateTo = nil
                         performSearch()
                     }
                 }
                 if filter.highlightsOnly {
                     filterChip("Highlights Only") {
-                        filter = SearchFilter(
-                            query: filter.query,
-                            dateFrom: filter.dateFrom,
-                            dateTo: filter.dateTo,
-                            highlightsOnly: false,
-                            languageMode: filter.languageMode,
-                            hasAudio: filter.hasAudio,
-                            sortOrder: filter.sortOrder
-                        )
+                        filter.highlightsOnly = false
                         performSearch()
                     }
                 }
                 if filter.hasAudio == true {
                     filterChip("Has Audio") {
-                        filter = SearchFilter(
-                            query: filter.query,
-                            dateFrom: filter.dateFrom,
-                            dateTo: filter.dateTo,
-                            highlightsOnly: filter.highlightsOnly,
-                            languageMode: filter.languageMode,
-                            hasAudio: nil,
-                            sortOrder: filter.sortOrder
-                        )
+                        filter.hasAudio = nil
+                        performSearch()
+                    }
+                }
+                if let tagName = filter.tagName {
+                    filterChip("Tag: \(tagName)") {
+                        filter.tagName = nil
+                        performSearch()
+                    }
+                }
+                if let folderName = filter.folderName {
+                    filterChip("Folder: \(folderName)") {
+                        filter.folderName = nil
                         performSearch()
                     }
                 }
@@ -260,17 +234,7 @@ struct AdvancedSearchView: View {
                         "From",
                         selection: Binding(
                             get: { filter.dateFrom ?? Date.distantPast },
-                            set: { newValue in
-                                filter = SearchFilter(
-                                    query: filter.query,
-                                    dateFrom: newValue,
-                                    dateTo: filter.dateTo,
-                                    highlightsOnly: filter.highlightsOnly,
-                                    languageMode: filter.languageMode,
-                                    hasAudio: filter.hasAudio,
-                                    sortOrder: filter.sortOrder
-                                )
-                            }
+                            set: { filter.dateFrom = $0 }
                         ),
                         displayedComponents: .date
                     )
@@ -279,84 +243,47 @@ struct AdvancedSearchView: View {
                         "To",
                         selection: Binding(
                             get: { filter.dateTo ?? Date() },
-                            set: { newValue in
-                                filter = SearchFilter(
-                                    query: filter.query,
-                                    dateFrom: filter.dateFrom,
-                                    dateTo: newValue,
-                                    highlightsOnly: filter.highlightsOnly,
-                                    languageMode: filter.languageMode,
-                                    hasAudio: filter.hasAudio,
-                                    sortOrder: filter.sortOrder
-                                )
-                            }
+                            set: { filter.dateTo = $0 }
                         ),
                         displayedComponents: .date
                     )
 
                     if filter.dateFrom != nil || filter.dateTo != nil {
                         Button("Clear Dates") {
-                            filter = SearchFilter(
-                                query: filter.query,
-                                dateFrom: nil,
-                                dateTo: nil,
-                                highlightsOnly: filter.highlightsOnly,
-                                languageMode: filter.languageMode,
-                                hasAudio: filter.hasAudio,
-                                sortOrder: filter.sortOrder
-                            )
+                            filter.dateFrom = nil
+                            filter.dateTo = nil
                         }
                         .foregroundStyle(.red)
                     }
                 }
 
                 Section("Filters") {
-                    Toggle("Highlights Only", isOn: Binding(
-                        get: { filter.highlightsOnly },
-                        set: { newValue in
-                            filter = SearchFilter(
-                                query: filter.query,
-                                dateFrom: filter.dateFrom,
-                                dateTo: filter.dateTo,
-                                highlightsOnly: newValue,
-                                languageMode: filter.languageMode,
-                                hasAudio: filter.hasAudio,
-                                sortOrder: filter.sortOrder
-                            )
-                        }
-                    ))
+                    Toggle("Highlights Only", isOn: $filter.highlightsOnly)
 
                     Toggle("Has Audio", isOn: Binding(
                         get: { filter.hasAudio ?? false },
-                        set: { newValue in
-                            filter = SearchFilter(
-                                query: filter.query,
-                                dateFrom: filter.dateFrom,
-                                dateTo: filter.dateTo,
-                                highlightsOnly: filter.highlightsOnly,
-                                languageMode: filter.languageMode,
-                                hasAudio: newValue ? true : nil,
-                                sortOrder: filter.sortOrder
-                            )
-                        }
+                        set: { filter.hasAudio = $0 ? true : nil }
                     ))
                 }
 
-                Section("Sort") {
-                    Picker("Sort Order", selection: Binding(
-                        get: { filter.sortOrder },
-                        set: { newValue in
-                            filter = SearchFilter(
-                                query: filter.query,
-                                dateFrom: filter.dateFrom,
-                                dateTo: filter.dateTo,
-                                highlightsOnly: filter.highlightsOnly,
-                                languageMode: filter.languageMode,
-                                hasAudio: filter.hasAudio,
-                                sortOrder: newValue
-                            )
+                Section("Tags & Folders") {
+                    Picker("Tag", selection: $filter.tagName) {
+                        Text("Any").tag(String?.none)
+                        ForEach(availableTags) { tag in
+                            Text(tag.name).tag(Optional(tag.name))
                         }
-                    )) {
+                    }
+
+                    Picker("Folder", selection: $filter.folderName) {
+                        Text("Any").tag(String?.none)
+                        ForEach(availableFolders) { folder in
+                            Text(folder.name).tag(Optional(folder.name))
+                        }
+                    }
+                }
+
+                Section("Sort") {
+                    Picker("Sort Order", selection: $filter.sortOrder) {
                         ForEach(SearchFilter.SortOrder.allCases) { order in
                             Text(order.displayName).tag(order)
                         }
@@ -379,8 +306,12 @@ struct AdvancedSearchView: View {
                     }
                 }
             }
+            .onAppear {
+                availableTags = container.repository.fetchAllTags().map { $0.toInfo() }
+                availableFolders = container.repository.fetchAllFolders().map { $0.toInfo() }
+            }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 
     // MARK: - Actions
@@ -388,10 +319,17 @@ struct AdvancedSearchView: View {
     private func performSearch() {
         guard !filter.isEmpty else {
             results = []
+            totalCount = 0
+            hasMore = false
             return
         }
-        // The actual search will be wired through AppContainer in integration phase.
-        // For now, this is the UI structure.
+
+        isSearching = true
+        let searchResults = container.advancedSearch.search(filter: filter, page: currentPage)
+        results = currentPage == 0 ? searchResults.segments : results + searchResults.segments
+        totalCount = searchResults.totalCount
+        hasMore = searchResults.hasMore
+        isSearching = false
     }
 
     // MARK: - Formatting

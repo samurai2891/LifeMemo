@@ -37,6 +37,7 @@ final class RecordingHealthMonitor: ObservableObject {
     private var chunkCount = 0
     private var successCount = 0
     private var failCount = 0
+    private var lastKnownFileModification: Date?
 
     // MARK: - Lifecycle
 
@@ -48,7 +49,7 @@ final class RecordingHealthMonitor: ObservableObject {
         warnings = []
         isHealthy = true
 
-        checkTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+        checkTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.performHealthCheck()
             }
@@ -72,6 +73,10 @@ final class RecordingHealthMonitor: ObservableObject {
 
     func recordTranscriptionFailure() {
         failCount += 1
+    }
+
+    func updateLastFileModification(_ date: Date) {
+        lastKnownFileModification = date
     }
 
     // MARK: - Health Check
@@ -105,6 +110,14 @@ final class RecordingHealthMonitor: ObservableObject {
 
         if snapshot.sessionDurationHours > 24 {
             newWarnings.append("Recording session exceeds 24 hours")
+        }
+
+        if let lastMod = lastKnownFileModification {
+            let staleDuration = Date().timeIntervalSince(lastMod)
+            if staleDuration > 120 { // 2 minutes without file activity
+                newWarnings.append("Recording may have stalled (no file activity for \(Int(staleDuration))s)")
+                logger.warning("File write stall detected: \(staleDuration)s since last write")
+            }
         }
 
         warnings = newWarnings

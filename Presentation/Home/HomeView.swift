@@ -97,9 +97,20 @@ struct HomeView: View {
                 ProgressView("Loading sessions...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.filteredSessions.isEmpty {
-                emptyState
+                VStack(spacing: 0) {
+                    if !viewModel.availableFolders.isEmpty {
+                        folderFilterBar
+                    }
+                    emptyState
+                }
             } else {
                 List {
+                    if !viewModel.availableFolders.isEmpty {
+                        folderFilterBar
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                    }
+
                     ForEach(viewModel.filteredSessions) { session in
                         NavigationLink {
                             SessionDetailView(
@@ -125,6 +136,50 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Folder Filter Bar
+
+    private var folderFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                folderChip(label: "All", isSelected: viewModel.selectedFolderFilter == nil) {
+                    viewModel.selectedFolderFilter = nil
+                }
+
+                ForEach(viewModel.availableFolders) { folder in
+                    folderChip(
+                        label: folder.name,
+                        isSelected: viewModel.selectedFolderFilter == folder
+                    ) {
+                        viewModel.selectedFolderFilter = folder
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func folderChip(
+        label: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: "folder")
+                    .font(.caption2)
+                Text(label)
+                    .font(.subheadline)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(isSelected ? Color.accentColor : Color(.systemGray5))
+            .foregroundStyle(isSelected ? .white : .primary)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private var emptyState: some View {
@@ -261,6 +316,28 @@ private struct SessionRowView: View {
                     Label("Summary", systemImage: "doc.text")
                         .font(.caption2)
                         .foregroundStyle(Color.accentColor)
+                }
+
+                if let folderName = session.folderName {
+                    Label(folderName, systemImage: "folder")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let placeName = session.placeName, !placeName.isEmpty {
+                    Label(placeName, systemImage: "location")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !session.tags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(session.tags) { tag in
+                            TagChipView(tag: tag)
+                        }
+                    }
                 }
             }
         }

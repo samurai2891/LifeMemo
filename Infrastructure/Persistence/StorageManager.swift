@@ -177,7 +177,7 @@ final class StorageManager: ObservableObject {
             return
         }
 
-        let exportDir = base.appendingPathComponent("Export", isDirectory: true)
+        let exportDir = base.appendingPathComponent("Exports", isDirectory: true)
         let fm = FileManager.default
 
         do {
@@ -199,10 +199,11 @@ final class StorageManager: ObservableObject {
     ///
     /// The backup is stored as a directory containing copies of the SQLite
     /// store, WAL, and SHM files. Returns the URL of the created backup.
+    @available(*, deprecated, message: "Use BackupService instead")
     func createBackup() -> Result<URL, StorageError> {
         do {
             let base = try fileStore.appDataDir()
-            let backupDir = base.appendingPathComponent("Backup", isDirectory: true)
+            let backupDir = base.appendingPathComponent("Backups", isDirectory: true)
             try FileManager.default.createDirectory(
                 at: backupDir,
                 withIntermediateDirectories: true
@@ -250,7 +251,7 @@ final class StorageManager: ObservableObject {
             return
         }
 
-        let backupDir = base.appendingPathComponent("Backup", isDirectory: true)
+        let backupDir = base.appendingPathComponent("Backups", isDirectory: true)
         let fm = FileManager.default
 
         guard let contents = try? fm.contentsOfDirectory(
@@ -323,8 +324,7 @@ final class StorageManager: ObservableObject {
     // MARK: - Private Helpers
 
     private func coreDataStoreURL(base: URL) -> URL {
-        let parent = base.deletingLastPathComponent()
-        return parent.appendingPathComponent("LifeMemo.sqlite")
+        base.appendingPathComponent("CoreData/LifeMemo.sqlite")
     }
 
     private func copyFileIfExists(from source: URL, to directory: URL, name: String) throws {
@@ -344,7 +344,7 @@ final class StorageManager: ObservableObject {
 
     private func exportDirectorySize() -> Int64 {
         guard let base = try? fileStore.appDataDir() else { return 0 }
-        return directorySize(at: base.appendingPathComponent("Export"))
+        return directorySize(at: base.appendingPathComponent("Exports"))
     }
 
     private func ftsIndexSize() -> Int64 {

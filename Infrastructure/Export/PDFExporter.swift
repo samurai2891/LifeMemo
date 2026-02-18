@@ -34,7 +34,9 @@ enum PDFExporter {
 
         renderTitle(model: model, renderer: &renderer)
         renderMetadata(model: model, options: options, renderer: &renderer)
+        renderExtendedFields(model: model, renderer: &renderer)
         renderSeparator(renderer: &renderer)
+        renderBodyText(model: model, renderer: &renderer)
         renderSummary(model: model, options: options, renderer: &renderer)
         renderHighlights(model: model, options: options, renderer: &renderer)
         renderTranscript(model: model, options: options, renderer: &renderer)
@@ -74,6 +76,41 @@ enum PDFExporter {
         for line in meta {
             renderer.drawText(line, font: .systemFont(ofSize: 11), color: .darkGray)
         }
+        renderer.advance(16)
+    }
+
+    private static func renderExtendedFields(
+        model: ExportModel,
+        renderer: inout PDFPageRenderer
+    ) {
+        if let folderName = model.folderName, !folderName.isEmpty {
+            renderer.drawText("Folder: \(folderName)", font: .systemFont(ofSize: 11), color: .darkGray)
+        }
+        if !model.tags.isEmpty {
+            renderer.drawText(
+                "Tags: \(model.tags.joined(separator: ", "))",
+                font: .systemFont(ofSize: 11),
+                color: .darkGray
+            )
+        }
+        if let locationName = model.locationName, !locationName.isEmpty {
+            renderer.drawText("Location: \(locationName)", font: .systemFont(ofSize: 11), color: .darkGray)
+        }
+    }
+
+    private static func renderBodyText(
+        model: ExportModel,
+        renderer: inout PDFPageRenderer
+    ) {
+        guard let bodyText = model.bodyText, !bodyText.isEmpty else { return }
+
+        renderer.drawText(
+            "Notes",
+            font: .systemFont(ofSize: 18, weight: .semibold),
+            color: .black
+        )
+        renderer.advance(8)
+        renderer.drawText(bodyText, font: .systemFont(ofSize: 11), color: .darkGray)
         renderer.advance(16)
     }
 

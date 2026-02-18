@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import Combine
 
 /// ViewModel for the active recording screen.
 ///
@@ -10,12 +11,15 @@ final class RecordingViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    @Published private(set) var waveformLevels: [CGFloat] = Array(repeating: 0.1, count: 30)
+    @Published private(set) var waveformLevels: [Float] = Array(repeating: 0.1, count: 30)
+    @Published var liveTranscriptText: String = ""
 
     // MARK: - Dependencies
 
     private let coordinator: RecordingCoordinator
     private let repository: SessionRepository
+    private weak var meterCollector: AudioMeterCollector?
+    private var meterCancellable: AnyCancellable?
     private var waveformTimer: Timer?
 
     // MARK: - Computed
@@ -31,9 +35,10 @@ final class RecordingViewModel: ObservableObject {
 
     // MARK: - Init
 
-    init(coordinator: RecordingCoordinator, repository: SessionRepository) {
+    init(coordinator: RecordingCoordinator, repository: SessionRepository, meterCollector: AudioMeterCollector?) {
         self.coordinator = coordinator
         self.repository = repository
+        self.meterCollector = meterCollector
     }
 
     // MARK: - Actions
@@ -48,33 +53,29 @@ final class RecordingViewModel: ObservableObject {
         coordinator.stop()
     }
 
-    // MARK: - Waveform Simulation
+    // MARK: - Waveform
 
     func startWaveformAnimation() {
         waveformTimer?.invalidate()
-        waveformTimer = Timer.scheduledTimer(
-            withTimeInterval: 0.1,
-            repeats: true
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.updateWaveformLevels()
-            }
+        // Subscribe to meter collector updates
+        if let collector = meterCollector {
+            meterCancellable = collector.$recentLevels
+                .receive(on: RunLoop.main)
+                .sink { [weak self] levels in
+                    self?.waveformLevels = levels
+                }
         }
     }
 
     func stopWaveformAnimation() {
+        meterCancellable?.cancel()
+        meterCancellable = nil
         waveformTimer?.invalidate()
         waveformTimer = nil
         waveformLevels = Array(repeating: 0.1, count: 30)
     }
 
     // MARK: - Private
-
-    private func updateWaveformLevels() {
-        waveformLevels = (0..<30).map { _ in
-            CGFloat.random(in: 0.05...1.0)
-        }
-    }
 
     private func triggerHaptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
         let generator = UIImpactFeedbackGenerator(style: style)

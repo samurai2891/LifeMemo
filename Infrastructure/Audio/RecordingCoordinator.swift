@@ -22,6 +22,10 @@ final class RecordingCoordinator: ObservableObject {
     private let interruptionHandler: AudioInterruptionHandler
     private let healthMonitor: RecordingHealthMonitor
 
+    // MARK: - Callbacks
+
+    var onRecordingError: ((String) -> Void)?
+
     // MARK: - Internal State
 
     private var currentLanguage: LanguageMode = .auto
@@ -53,16 +57,21 @@ final class RecordingCoordinator: ObservableObject {
             try audioSession.activateRecordingSession()
             let sessionId = repository.createSession(languageMode: languageMode)
             self.currentLanguage = languageMode
-            try chunkRecorder.start(sessionId: sessionId, languageMode: languageMode)
+            let audioConfig = AudioConfiguration.current()
+            try chunkRecorder.start(
+                sessionId: sessionId,
+                languageMode: languageMode,
+                config: audioConfig.toRecorderConfig()
+            )
             repository.updateSessionStatus(sessionId: sessionId, status: .recording)
             self.state = .recording(sessionId: sessionId)
             startElapsedTimer()
             healthMonitor.startMonitoring(sessionStart: Date())
         } catch {
             audioSession.deactivate()
-            self.state = .error(
-                message: "Failed to start recording: \(error.localizedDescription)"
-            )
+            let errorMessage = "Failed to start recording: \(error.localizedDescription)"
+            self.state = .error(message: errorMessage)
+            onRecordingError?(errorMessage)
         }
     }
 
@@ -111,14 +120,16 @@ final class RecordingCoordinator: ObservableObject {
                 guard case let .recording(sessionId) = self.state else { return }
                 do {
                     try self.audioSession.activateRecordingSession()
+                    let audioConfig = AudioConfiguration.current()
                     try self.chunkRecorder.start(
                         sessionId: sessionId,
-                        languageMode: self.currentLanguage
+                        languageMode: self.currentLanguage,
+                        config: audioConfig.toRecorderConfig()
                     )
                 } catch {
-                    self.state = .error(
-                        message: "Failed to resume after interruption: \(error.localizedDescription)"
-                    )
+                    let errorMessage = "Failed to resume after interruption: \(error.localizedDescription)"
+                    self.state = .error(message: errorMessage)
+                    self.onRecordingError?(errorMessage)
                 }
             }
         }

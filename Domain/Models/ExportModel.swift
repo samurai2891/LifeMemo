@@ -9,6 +9,10 @@ struct ExportModel {
     let summaryMarkdown: String?
     let fullTranscript: String
     let highlights: [HighlightInfo]
+    let bodyText: String?
+    let tags: [String]
+    let folderName: String?
+    let locationName: String?
 
     var safeFileName: String {
         let formatter = DateFormatter()

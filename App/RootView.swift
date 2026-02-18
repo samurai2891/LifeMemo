@@ -12,6 +12,7 @@ struct RootView: View {
     @EnvironmentObject private var container: AppContainer
     @EnvironmentObject private var coordinator: RecordingCoordinator
     @EnvironmentObject private var permissionService: SpeechPermissionService
+    @EnvironmentObject private var appLockManager: AppLockManager
 
     // MARK: - State
 
@@ -29,25 +30,33 @@ struct RootView: View {
     // MARK: - Body
 
     var body: some View {
-        Group {
-            if showOnboarding {
-                OnboardingView(
-                    permissionService: permissionService
-                ) {
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        showOnboarding = false
+        ZStack {
+            Group {
+                if showOnboarding {
+                    OnboardingView(
+                        permissionService: permissionService
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            showOnboarding = false
+                        }
                     }
+                    .transition(.opacity)
+                } else {
+                    HomeView(
+                        repository: container.repository,
+                        searchService: container.search
+                    )
+                    .transition(.opacity)
                 }
-                .transition(.opacity)
-            } else {
-                HomeView(
-                    repository: container.repository,
-                    searchService: container.search
-                )
-                .transition(.opacity)
+            }
+            .animation(.easeInOut(duration: 0.4), value: showOnboarding)
+
+            // App Lock overlay (highest priority)
+            if appLockManager.isLocked && appLockManager.isEnabled {
+                LockScreenView()
+                    .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.4), value: showOnboarding)
     }
 }
 

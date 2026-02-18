@@ -132,6 +132,133 @@ final class SessionRepository {
         return session.languageMode.locale
     }
 
+    // MARK: - Session Finalization
+
+    /// Checks if all chunks in a session have completed transcription (done or failed).
+    /// If so, transitions the session status from `.processing` to `.ready`.
+    func checkAndFinalizeSessionStatus(sessionId: UUID) {
+        guard let session = fetchSession(id: sessionId) else { return }
+        guard session.status == .processing else { return }
+
+        let chunks = session.chunksArray
+        guard !chunks.isEmpty else { return }
+
+        let allFinished = chunks.allSatisfy { chunk in
+            chunk.transcriptionStatus == .done
+                || chunk.transcriptionStatus == .failed
+        }
+
+        if allFinished {
+            session.status = .ready
+            saveOrLog()
+        }
+    }
+
+    // MARK: - Session Editing
+
+    func updateSegmentText(segmentId: UUID, newText: String) {
+        let request = NSFetchRequest<TranscriptSegmentEntity>(entityName: "TranscriptSegmentEntity")
+        request.predicate = NSPredicate(format: "id == %@", segmentId as CVarArg)
+        request.fetchLimit = 1
+
+        guard let segment = try? context.fetch(request).first else { return }
+
+        // Save original text if this is the first edit
+        if !segment.isUserEdited {
+            segment.originalText = segment.text
+        }
+        segment.text = newText
+        segment.isUserEdited = true
+        saveOrLog()
+    }
+
+    func renameSession(sessionId: UUID, newTitle: String) {
+        guard let session = fetchSession(id: sessionId) else { return }
+        session.title = newTitle
+        saveOrLog()
+    }
+
+    func updateSessionBodyText(sessionId: UUID, bodyText: String?) {
+        guard let session = fetchSession(id: sessionId) else { return }
+        session.bodyText = bodyText
+        saveOrLog()
+    }
+
+    // MARK: - Tags
+
+    func createTag(name: String, colorHex: String? = nil) -> UUID {
+        let tag = TagEntity(context: context)
+        let tagId = UUID()
+        tag.id = tagId
+        tag.name = name
+        tag.colorHex = colorHex
+        tag.createdAt = Date()
+        saveOrLog()
+        return tagId
+    }
+
+    func fetchAllTags() -> [TagEntity] {
+        let request = NSFetchRequest<TagEntity>(entityName: "TagEntity")
+        request.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
+        return (try? context.fetch(request)) ?? []
+    }
+
+    func addTag(tagId: UUID, toSession sessionId: UUID) {
+        guard let session = fetchSession(id: sessionId) else { return }
+        let request = NSFetchRequest<TagEntity>(entityName: "TagEntity")
+        request.predicate = NSPredicate(format: "id == %@", tagId as CVarArg)
+        request.fetchLimit = 1
+        guard let tag = try? context.fetch(request).first else { return }
+
+        let mutableTags = session.mutableSetValue(forKey: "tags")
+        mutableTags.add(tag)
+        saveOrLog()
+    }
+
+    func removeTag(tagId: UUID, fromSession sessionId: UUID) {
+        guard let session = fetchSession(id: sessionId) else { return }
+        let request = NSFetchRequest<TagEntity>(entityName: "TagEntity")
+        request.predicate = NSPredicate(format: "id == %@", tagId as CVarArg)
+        request.fetchLimit = 1
+        guard let tag = try? context.fetch(request).first else { return }
+
+        let mutableTags = session.mutableSetValue(forKey: "tags")
+        mutableTags.remove(tag)
+        saveOrLog()
+    }
+
+    // MARK: - Folders
+
+    func createFolder(name: String) -> UUID {
+        let folder = FolderEntity(context: context)
+        let folderId = UUID()
+        folder.id = folderId
+        folder.name = name
+        folder.sortOrder = 0
+        folder.createdAt = Date()
+        saveOrLog()
+        return folderId
+    }
+
+    func fetchAllFolders() -> [FolderEntity] {
+        let request = NSFetchRequest<FolderEntity>(entityName: "FolderEntity")
+        request.sortDescriptors = [NSSortDescriptor(key: "sortOrder", ascending: true)]
+        return (try? context.fetch(request)) ?? []
+    }
+
+    func setSessionFolder(sessionId: UUID, folderId: UUID?) {
+        guard let session = fetchSession(id: sessionId) else { return }
+        if let folderId {
+            let request = NSFetchRequest<FolderEntity>(entityName: "FolderEntity")
+            request.predicate = NSPredicate(format: "id == %@", folderId as CVarArg)
+            request.fetchLimit = 1
+            session.folder = try? context.fetch(request).first
+        } else {
+            session.folder = nil
+        }
+        saveOrLog()
+    }
+
     // MARK: - Summary
 
     func refreshSessionSummary(sessionId: UUID) {
@@ -346,7 +473,11 @@ final class SessionRepository {
                 audioKept: false,
                 summaryMarkdown: nil,
                 fullTranscript: "",
-                highlights: []
+                highlights: [],
+                bodyText: nil,
+                tags: [],
+                folderName: nil,
+                locationName: nil
             )
         }
 
@@ -361,8 +492,67 @@ final class SessionRepository {
             audioKept: session.audioKept,
             summaryMarkdown: session.summary,
             fullTranscript: transcript,
-            highlights: highlights
+            highlights: highlights,
+            bodyText: session.bodyText,
+            tags: session.tagsArray.map { $0.name ?? "" },
+            folderName: session.folder?.name,
+            locationName: session.placeName
         )
+    }
+
+    // MARK: - Backup Import
+
+    /// Imports a session from a backup manifest entry, creating all related entities.
+    /// Called by BackupService during restore. Skips if session with same ID already exists.
+    func importSession(from backup: BackupManifest.SessionBackup) {
+        let session = SessionEntity(context: context)
+        session.id = backup.id
+        session.title = backup.title
+        session.createdAt = backup.createdAt
+        session.startedAt = backup.startedAt
+        session.endedAt = backup.endedAt
+        session.languageModeRaw = backup.languageModeRaw
+        session.statusRaw = backup.statusRaw
+        session.audioKept = backup.audioKept
+        session.summary = backup.summary
+        session.bodyText = backup.bodyText
+
+        for chunkBackup in backup.chunks {
+            let chunk = ChunkEntity(context: context)
+            chunk.id = chunkBackup.id
+            chunk.index = chunkBackup.index
+            chunk.startAt = chunkBackup.startAt
+            chunk.endAt = chunkBackup.endAt
+            chunk.relativePath = chunkBackup.relativePath
+            chunk.durationSec = chunkBackup.durationSec
+            chunk.sizeBytes = chunkBackup.sizeBytes
+            chunk.transcriptionStatusRaw = chunkBackup.transcriptionStatusRaw
+            chunk.audioDeleted = chunkBackup.audioDeleted
+            chunk.session = session
+        }
+
+        for segmentBackup in backup.segments {
+            let segment = TranscriptSegmentEntity(context: context)
+            segment.id = segmentBackup.id
+            segment.startMs = segmentBackup.startMs
+            segment.endMs = segmentBackup.endMs
+            segment.text = segmentBackup.text
+            segment.isUserEdited = segmentBackup.isUserEdited
+            segment.originalText = segmentBackup.originalText
+            segment.createdAt = segmentBackup.createdAt
+            segment.session = session
+        }
+
+        for highlightBackup in backup.highlights {
+            let highlight = HighlightEntity(context: context)
+            highlight.id = highlightBackup.id
+            highlight.atMs = highlightBackup.atMs
+            highlight.label = highlightBackup.label
+            highlight.createdAt = highlightBackup.createdAt
+            highlight.session = session
+        }
+
+        saveOrLog()
     }
 
     // MARK: - Private Helpers

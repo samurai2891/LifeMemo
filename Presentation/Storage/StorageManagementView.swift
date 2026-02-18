@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Storage management screen showing disk usage, cleanup options,
-/// backup/restore, and iCloud sync controls.
+/// and backup management.
 struct StorageManagementView: View {
 
     // MARK: - Environment
@@ -11,11 +11,10 @@ struct StorageManagementView: View {
 
     // MARK: - Init
 
-    init(storageManager: StorageManager, cloudSyncManager: CloudSyncManager) {
+    init(storageManager: StorageManager) {
         _viewModel = StateObject(
             wrappedValue: StorageManagementViewModel(
-                storageManager: storageManager,
-                cloudSyncManager: cloudSyncManager
+                storageManager: storageManager
             )
         )
     }
@@ -29,15 +28,15 @@ struct StorageManagementView: View {
             deviceStorageSection
             sessionListSection
             cleanupSection
+            storageLimitSection
             backupSection
-            iCloudSyncSection
+            backupNavigationSection
         }
         .navigationTitle("Storage")
         .navigationBarTitleDisplayMode(.inline)
         .overlay { RecordingIndicatorOverlay() }
         .onAppear {
             viewModel.loadStorage()
-            viewModel.refreshiCloudStatus()
         }
         .alert(item: $viewModel.activeAlert) { alertType in
             alertFor(alertType)
@@ -287,82 +286,42 @@ struct StorageManagementView: View {
         .padding(.vertical, 2)
     }
 
-    // MARK: - iCloud Sync Section
+    // MARK: - Storage Limit Section
 
-    private var iCloudSyncSection: some View {
+    private var storageLimitSection: some View {
         Section {
-            Toggle(isOn: Binding(
-                get: { viewModel.isSyncEnabled },
-                set: { viewModel.toggleSync(enabled: $0) }
-            )) {
-                Label("iCloud Sync", systemImage: "icloud")
+            Stepper(
+                "Limit: \(viewModel.storageLimitGB) GB",
+                value: $viewModel.storageLimitGB,
+                in: 1...50
+            )
+
+            Toggle(isOn: $viewModel.autoDeleteEnabled) {
+                Label("Auto-Delete Old Audio", systemImage: "clock.arrow.circlepath")
             }
 
-            if viewModel.isSyncEnabled {
-                HStack {
-                    Text("Status")
-                    Spacer()
-                    syncStatusView
-                }
-
-                HStack {
-                    Text("Last Sync")
-                    Spacer()
-                    Text(viewModel.lastSyncDisplayText)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if !viewModel.iCloudStatusText.isEmpty {
-                HStack {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.secondary)
-                    Text(viewModel.iCloudStatusText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            HStack {
+                Text("Current Usage")
+                Spacer()
+                Text(viewModel.formatBytes(viewModel.breakdown.totalBytes))
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
         } header: {
-            Text("iCloud")
+            Text("Storage Limit")
         } footer: {
-            Text("Syncs session metadata and transcripts across your devices. Audio files are not synced due to their large size.")
+            Text("When auto-delete is enabled, the oldest audio files will be removed when storage exceeds the limit.")
         }
     }
 
-    @ViewBuilder
-    private var syncStatusView: some View {
-        switch viewModel.syncState {
-        case .disabled:
-            Text("Disabled")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        case .idle:
-            HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .font(.caption)
-                Text("Up to date")
-                    .font(.subheadline)
-                    .foregroundStyle(.green)
-            }
-        case .syncing:
-            HStack(spacing: 4) {
-                ProgressView()
-                    .scaleEffect(0.7)
-                Text("Syncing...")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.accentColor)
-            }
-        case .error(let message):
-            HStack(spacing: 4) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                    .font(.caption)
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .lineLimit(2)
+    // MARK: - Backup Navigation Section
+
+    private var backupNavigationSection: some View {
+        Section {
+            NavigationLink {
+                Text("Backup & Restore")
+            } label: {
+                Label("Backup & Restore", systemImage: "arrow.triangle.2.circlepath")
             }
         }
     }
@@ -426,13 +385,6 @@ struct StorageManagementView: View {
             return Alert(
                 title: Text("Cleanup Complete"),
                 message: Text(message),
-                dismissButton: .default(Text("OK"))
-            )
-
-        case .iCloudUnavailable(let statusText):
-            return Alert(
-                title: Text("iCloud Unavailable"),
-                message: Text(statusText),
                 dismissButton: .default(Text("OK"))
             )
         }

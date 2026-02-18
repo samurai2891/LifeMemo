@@ -6,6 +6,9 @@ import Foundation
 /// to avoid overloading the on-device speech recognizer. Each job updates
 /// the chunk's transcription status in Core Data, runs the recognizer, and
 /// saves the resulting transcript.
+///
+/// Processing is deferred while recording is active, under low power mode,
+/// or when thermal state is serious/critical.
 actor TranscriptionQueueActor {
 
     // MARK: - Dependencies
@@ -16,6 +19,7 @@ actor TranscriptionQueueActor {
     // MARK: - Queue State
 
     private var isRunning = false
+    private var isRecordingActive = false
     private var pendingJobs: [(sessionId: UUID, chunkId: UUID)] = []
 
     // MARK: - Initializer
@@ -37,14 +41,51 @@ actor TranscriptionQueueActor {
         await processQueueIfNeeded()
     }
 
+    /// Removes all pending jobs from the queue.
+    func cancelAll() {
+        pendingJobs.removeAll()
+    }
+
+    /// Removes a specific pending job by chunk identifier.
+    ///
+    /// - Parameter chunkId: The identifier of the chunk to remove from the queue.
+    func cancelJob(chunkId: UUID) {
+        pendingJobs.removeAll { $0.chunkId == chunkId }
+    }
+
+    /// Sets whether recording is currently active.
+    ///
+    /// While recording is active, transcription processing is deferred to avoid
+    /// competing for resources. When recording stops, the queue is flushed.
+    ///
+    /// - Parameter active: Whether recording is currently in progress.
+    func setRecordingActive(_ active: Bool) async {
+        isRecordingActive = active
+        if !active {
+            await processQueueIfNeeded()
+        }
+    }
+
     // MARK: - Queue Processing
+
+    private var shouldDefer: Bool {
+        if isRecordingActive { return true }
+        let processInfo = ProcessInfo.processInfo
+        if processInfo.isLowPowerModeEnabled { return true }
+        if processInfo.thermalState == .serious
+            || processInfo.thermalState == .critical {
+            return true
+        }
+        return false
+    }
 
     private func processQueueIfNeeded() async {
         guard !isRunning else { return }
+        guard !shouldDefer else { return }
         isRunning = true
         defer { isRunning = false }
 
-        while !pendingJobs.isEmpty {
+        while !pendingJobs.isEmpty && !shouldDefer {
             let job = pendingJobs.removeFirst()
             await processJob(sessionId: job.sessionId, chunkId: job.chunkId)
         }
@@ -63,7 +104,7 @@ actor TranscriptionQueueActor {
         }
 
         guard let fileURL = chunkURL else {
-            await markFailed(chunkId: chunkId)
+            await markFailed(chunkId: chunkId, sessionId: sessionId)
             return
         }
 
@@ -84,24 +125,26 @@ actor TranscriptionQueueActor {
                     status: .done
                 )
                 repository.refreshSessionSummary(sessionId: sessionId)
+                repository.checkAndFinalizeSessionStatus(sessionId: sessionId)
             }
         } catch {
             print(
                 "TranscriptionQueueActor: transcription failed for chunk "
                 + "\(chunkId): \(error.localizedDescription)"
             )
-            await markFailed(chunkId: chunkId)
+            await markFailed(chunkId: chunkId, sessionId: sessionId)
         }
     }
 
     // MARK: - Helpers
 
-    private func markFailed(chunkId: UUID) async {
+    private func markFailed(chunkId: UUID, sessionId: UUID) async {
         await MainActor.run {
             repository.updateChunkTranscriptionStatus(
                 chunkId: chunkId,
                 status: .failed
             )
+            repository.checkAndFinalizeSessionStatus(sessionId: sessionId)
         }
     }
 }

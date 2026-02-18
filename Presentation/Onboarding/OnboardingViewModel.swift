@@ -12,7 +12,7 @@ final class OnboardingViewModel: ObservableObject {
 
     static let consentKey = "didAcceptAlwaysOnConsent"
     static let onboardingCompleteKey = "onboardingComplete"
-    static let totalSteps = 5
+    static let totalSteps = 6
 
     // MARK: - Published State
 

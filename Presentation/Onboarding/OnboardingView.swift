@@ -7,7 +7,8 @@ import SwiftUI
 /// 1. Privacy explanation
 /// 2. Always-on consent toggle
 /// 3. Permission requests (microphone + speech)
-/// 4. Done / get started
+/// 4. App Lock recommendation
+/// 5. Done / get started
 struct OnboardingView: View {
 
     // MARK: - Environment
@@ -46,7 +47,8 @@ struct OnboardingView: View {
                 privacyStep.tag(1)
                 consentStep.tag(2)
                 permissionStep.tag(3)
-                doneStep.tag(4)
+                appLockStep.tag(4)
+                doneStep.tag(5)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(.easeInOut(duration: 0.3), value: viewModel.currentStep)
@@ -338,7 +340,36 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 4: Done
+    // MARK: - Step 4: App Lock
+
+    private var appLockStep: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(Color.accentColor)
+
+            Text("Protect Your Data")
+                .font(.title.bold())
+                .multilineTextAlignment(.center)
+
+            Text("Enable App Lock to require authentication (Face ID, Touch ID, or passcode) when opening LifeMemo.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            Text("You can change this later in Settings.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - Step 5: Done
 
     private var doneStep: some View {
         VStack(spacing: 24) {

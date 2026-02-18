@@ -14,9 +14,9 @@ final class AudioSessionConfigurator {
     func activateRecordingSession() throws {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(
-            .record,
+            .playAndRecord,
             mode: .measurement,
-            options: [.allowBluetooth]
+            options: [.allowBluetooth, .defaultToSpeaker]
         )
         try session.setActive(true)
     }

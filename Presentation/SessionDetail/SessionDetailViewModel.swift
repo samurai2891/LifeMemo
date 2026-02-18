@@ -42,10 +42,26 @@ final class SessionDetailViewModel: ObservableObject {
     @Published var showDeleteSessionConfirm: Bool = false
     @Published private(set) var didDeleteSession: Bool = false
 
+    // Tags & Folder
+    @Published private(set) var tags: [TagInfo] = []
+    @Published private(set) var folderName: String?
+    @Published private(set) var currentFolderId: UUID?
+    @Published var showTagPicker: Bool = false
+    @Published var showFolderPicker: Bool = false
+
+    // Body Text
+    @Published var bodyText: String = ""
+    @Published var isEditingBodyText: Bool = false
+
+    // Transcript Editing
+    @Published var editingSegmentId: UUID?
+    @Published var editingSegmentText: String = ""
+    @Published private(set) var segments: [SegmentDisplayInfo] = []
+
     // MARK: - Dependencies
 
     let sessionId: UUID
-    private let repository: SessionRepository
+    let repository: SessionRepository
     private let fileStore: FileStore
     private let qnaService: SimpleQnAService
     private let summarizer: SimpleSummarizer
@@ -97,8 +113,96 @@ final class SessionDetailViewModel: ObservableObject {
             )
         }
 
+        // Tags & Folder
+        tags = entity.tagsArray.map { $0.toInfo() }
+        folderName = entity.folder?.name
+        currentFolderId = entity.folder?.id
+
+        // Body Text
+        bodyText = entity.bodyText ?? ""
+
+        // Segments
+        segments = entity.segmentsArray.map { seg in
+            SegmentDisplayInfo(
+                id: seg.id ?? UUID(),
+                text: seg.text ?? "",
+                startMs: seg.startMs,
+                endMs: seg.endMs,
+                isUserEdited: seg.isUserEdited,
+                originalText: seg.originalText
+            )
+        }
+
         setupPlayback(entity: entity)
         isLoading = false
+    }
+
+    // MARK: - Body Text
+
+    func saveBodyText() {
+        let trimmed = bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
+        repository.updateSessionBodyText(
+            sessionId: sessionId,
+            bodyText: trimmed.isEmpty ? nil : trimmed
+        )
+        isEditingBodyText = false
+
+        if let entity = repository.fetchSession(id: sessionId) {
+            session = entity.toSummary()
+        }
+    }
+
+    func cancelBodyTextEdit() {
+        bodyText = session?.bodyText ?? ""
+        isEditingBodyText = false
+    }
+
+    // MARK: - Transcript Editing
+
+    func beginSegmentEdit(_ segment: SegmentDisplayInfo) {
+        editingSegmentId = segment.id
+        editingSegmentText = segment.text
+    }
+
+    func saveSegmentEdit() {
+        guard let segmentId = editingSegmentId else { return }
+        let trimmed = editingSegmentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        repository.updateSegmentText(segmentId: segmentId, newText: trimmed)
+        editingSegmentId = nil
+        editingSegmentText = ""
+
+        // Reload segments from entity
+        if let entity = repository.fetchSession(id: sessionId) {
+            segments = entity.segmentsArray.map { seg in
+                SegmentDisplayInfo(
+                    id: seg.id ?? UUID(),
+                    text: seg.text ?? "",
+                    startMs: seg.startMs,
+                    endMs: seg.endMs,
+                    isUserEdited: seg.isUserEdited,
+                    originalText: seg.originalText
+                )
+            }
+            transcript = repository.getFullTranscriptText(sessionId: sessionId)
+        }
+    }
+
+    func cancelSegmentEdit() {
+        editingSegmentId = nil
+        editingSegmentText = ""
+    }
+
+    // MARK: - Tag Management
+
+    func removeTag(_ tag: TagInfo) {
+        repository.removeTag(tagId: tag.id, fromSession: sessionId)
+
+        if let entity = repository.fetchSession(id: sessionId) {
+            tags = entity.tagsArray.map { $0.toInfo() }
+            session = entity.toSummary()
+        }
     }
 
     // MARK: - Playback
@@ -214,6 +318,17 @@ final class SessionDetailViewModel: ObservableObject {
         repository.deleteSessionCompletely(sessionId: sessionId)
         didDeleteSession = true
     }
+}
+
+// MARK: - Segment Display Info
+
+struct SegmentDisplayInfo: Identifiable {
+    let id: UUID
+    let text: String
+    let startMs: Int64
+    let endMs: Int64
+    let isUserEdited: Bool
+    let originalText: String?
 }
 
 // MARK: - Chunk Display Info

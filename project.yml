@@ -40,3 +40,17 @@ targets:
       path: Resources/Info.plist
     entitlements:
       path: Resources/LifeMemo.entitlements
+
+  LifeMemoTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: LifeMemoTests
+    dependencies:
+      - target: LifeMemo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lifememo.app.tests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/LifeMemo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LifeMemo"
+        BUNDLE_LOADER: "$(TEST_HOST)"

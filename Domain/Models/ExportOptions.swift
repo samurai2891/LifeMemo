@@ -14,6 +14,7 @@ struct ExportOptions: Equatable {
         case markdown = "Markdown"
         case text = "Text"
         case pdf = "PDF"
+        case json = "JSON"
 
         var id: String { rawValue }
 
@@ -22,6 +23,7 @@ struct ExportOptions: Equatable {
             case .markdown: return "md"
             case .text: return "txt"
             case .pdf: return "pdf"
+            case .json: return "json"
             }
         }
 
@@ -30,6 +32,7 @@ struct ExportOptions: Equatable {
             case .markdown: return "doc.text"
             case .text: return "doc.plaintext"
             case .pdf: return "doc.richtext"
+            case .json: return "curlybraces"
             }
         }
     }

@@ -5,13 +5,13 @@ final class FileStore {
     // MARK: - Directory Helpers
 
     func appDataDir() throws -> URL {
-        let doc = try FileManager.default.url(
-            for: .documentDirectory,
+        let appSupport = try FileManager.default.url(
+            for: .applicationSupportDirectory,
             in: .userDomainMask,
             appropriateFor: nil,
             create: true
         )
-        let dir = doc.appendingPathComponent("AppData", isDirectory: true)
+        let dir = appSupport.appendingPathComponent("LifeMemo", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
@@ -23,10 +23,7 @@ final class FileStore {
         let url = base.appendingPathComponent(relativePath)
         let parentDir = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
-        try FileManager.default.setAttributes(
-            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-            ofItemAtPath: parentDir.path
-        )
+        setRecordingProtection(at: parentDir)
         return url
     }
 
@@ -59,11 +56,41 @@ final class FileStore {
 
     func writeExport(text: String, ext: String, suggestedName: String) throws -> URL {
         let base = try appDataDir()
-        let exportDir = base.appendingPathComponent("Export", isDirectory: true)
+        let exportDir = base.appendingPathComponent("Exports", isDirectory: true)
         try FileManager.default.createDirectory(at: exportDir, withIntermediateDirectories: true)
         let file = exportDir.appendingPathComponent("\(suggestedName).\(ext)")
         try text.data(using: .utf8)?.write(to: file, options: [.atomic])
         return file
+    }
+
+    // MARK: - File Protection
+
+    func excludeFromBackup(url: URL) {
+        var mutableURL = url
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = true
+        try? mutableURL.setResourceValues(resourceValues)
+    }
+
+    func setRecordingProtection(at url: URL) {
+        try? FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: url.path
+        )
+    }
+
+    func setAtRestProtection(at url: URL) {
+        try? FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.complete],
+            ofItemAtPath: url.path
+        )
+    }
+
+    func setDatabaseProtection(at url: URL) {
+        try? FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.completeUnlessOpen],
+            ofItemAtPath: url.path
+        )
     }
 
     // MARK: - Size Calculation

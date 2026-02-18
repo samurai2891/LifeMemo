@@ -90,4 +90,15 @@ struct AudioConfiguration: Codable, Equatable {
     static func current() -> AudioConfiguration {
         .from(profile: loadProfile())
     }
+
+    // MARK: - Recorder Config Conversion
+
+    func toRecorderConfig() -> ChunkedAudioRecorder.Config {
+        ChunkedAudioRecorder.Config(
+            chunkSeconds: chunkDurationSeconds,
+            sampleRate: sampleRate,
+            channels: channels,
+            bitRate: bitRate
+        )
+    }
 }

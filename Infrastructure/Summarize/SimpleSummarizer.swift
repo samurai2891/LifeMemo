@@ -7,11 +7,17 @@ final class SimpleSummarizer: SummarizerProtocol {
     // MARK: - Dependencies
 
     private let repository: SessionRepository
+    private let extractiveSummarizer: NLExtractiveSummarizer
+    private let topicExtractor: TopicExtractor
 
     // MARK: - Init
 
-    init(repository: SessionRepository) {
+    init(repository: SessionRepository,
+         extractiveSummarizer: NLExtractiveSummarizer,
+         topicExtractor: TopicExtractor) {
         self.repository = repository
+        self.extractiveSummarizer = extractiveSummarizer
+        self.topicExtractor = topicExtractor
     }
 
     // MARK: - SummarizerProtocol
@@ -23,14 +29,21 @@ final class SimpleSummarizer: SummarizerProtocol {
         }
 
         let highlights = repository.getHighlights(sessionId: sessionId)
-        let head = String(fullText.prefix(600))
-        let keywords = extractKeywords(text: fullText)
-            .prefix(12)
-            .map { "- \($0)" }
-            .joined(separator: "\n")
+
+        // Use NL extractive summarizer
+        let result = extractiveSummarizer.summarize(text: fullText)
+        let topics = topicExtractor.extract(from: fullText)
 
         var md = "# Summary\n\n"
 
+        // Stats
+        md += "*\(result.inputWordCount) words"
+        if let lang = result.detectedLanguage {
+            md += " • \(lang)"
+        }
+        md += " • generated in \(String(format: "%.1f", result.processingTime * 1000))ms*\n\n"
+
+        // Highlights
         if !highlights.isEmpty {
             md += "## Highlights\n"
             for h in highlights.prefix(5) {
@@ -43,40 +56,32 @@ final class SimpleSummarizer: SummarizerProtocol {
             md += "\n"
         }
 
-        md += "## Overview\n\(head)\n\n"
+        // Key Points (extractive summary)
+        if !result.sentences.isEmpty {
+            md += "## Key Points\n"
+            for sentence in result.sentences.sorted(by: { $0.positionIndex < $1.positionIndex }) {
+                md += "- \(sentence.text)\n"
+            }
+            md += "\n"
+        }
 
-        if !keywords.isEmpty {
-            md += "## Keywords\n\(keywords)\n"
+        // Topics
+        if !topics.topicClusters.isEmpty {
+            md += "## Topics\n"
+            for topic in topics.topicClusters {
+                let related = topic.keywords.prefix(4).joined(separator: ", ")
+                md += "- **\(topic.label)** (\(related))\n"
+            }
+            md += "\n"
+        }
+
+        // Keywords
+        if !result.keywords.isEmpty {
+            md += "## Keywords\n"
+            md += result.keywords.prefix(12).map { "- \($0)" }.joined(separator: "\n")
+            md += "\n"
         }
 
         return md
-    }
-
-    // MARK: - Private
-
-    private func extractKeywords(text: String) -> [String] {
-        let tagger = NLTagger(tagSchemes: [.lexicalClass])
-        tagger.string = text
-
-        var counts: [String: Int] = [:]
-        let options: NLTagger.Options = [.omitWhitespace, .omitPunctuation, .joinNames]
-
-        tagger.enumerateTags(
-            in: text.startIndex..<text.endIndex,
-            unit: .word,
-            scheme: .lexicalClass,
-            options: options
-        ) { tag, range in
-            guard tag == .noun else { return true }
-            let token = String(text[range]).lowercased()
-            if token.count >= 2 {
-                counts[token, default: 0] += 1
-            }
-            return true
-        }
-
-        return counts
-            .sorted { $0.value > $1.value }
-            .map { $0.key }
     }
 }
