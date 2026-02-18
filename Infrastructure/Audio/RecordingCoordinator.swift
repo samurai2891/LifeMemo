@@ -21,6 +21,7 @@ final class RecordingCoordinator: ObservableObject {
     private let chunkRecorder: ChunkedAudioRecorder
     private let interruptionHandler: AudioInterruptionHandler
     private let healthMonitor: RecordingHealthMonitor
+    private let locationService: LocationService
 
     // MARK: - Callbacks
 
@@ -38,13 +39,15 @@ final class RecordingCoordinator: ObservableObject {
         audioSession: AudioSessionConfigurator,
         chunkRecorder: ChunkedAudioRecorder,
         interruptionHandler: AudioInterruptionHandler,
-        healthMonitor: RecordingHealthMonitor
+        healthMonitor: RecordingHealthMonitor,
+        locationService: LocationService
     ) {
         self.repository = repository
         self.audioSession = audioSession
         self.chunkRecorder = chunkRecorder
         self.interruptionHandler = interruptionHandler
         self.healthMonitor = healthMonitor
+        self.locationService = locationService
 
         setupInterruptionHandling()
     }
@@ -57,6 +60,10 @@ final class RecordingCoordinator: ObservableObject {
             try audioSession.activateRecordingSession()
             let sessionId = repository.createSession(languageMode: languageMode)
             self.currentLanguage = languageMode
+            let captureTiming = LocationPreference.captureTiming
+            if captureTiming == .onStart || captureTiming == .both {
+                locationService.captureCurrentLocation()
+            }
             let audioConfig = AudioConfiguration.current()
             try chunkRecorder.start(
                 sessionId: sessionId,
@@ -83,6 +90,11 @@ final class RecordingCoordinator: ObservableObject {
         healthMonitor.stopMonitoring()
         interruptionHandler.resetState()
 
+        let stopTiming = LocationPreference.captureTiming
+        if stopTiming == .onStop || stopTiming == .both {
+            locationService.captureCurrentLocation()
+        }
+
         Task {
             await chunkRecorder.stop()
             repository.updateSessionEnded(
@@ -90,6 +102,15 @@ final class RecordingCoordinator: ObservableObject {
                 endedAt: Date(),
                 status: .processing
             )
+            if let location = locationService.lastLocation {
+                repository.updateSessionLocation(
+                    sessionId: sessionId,
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude,
+                    placeName: locationService.lastPlaceName
+                )
+            }
+            locationService.reset()
             audioSession.deactivate()
             state = .idle
             elapsedSeconds = 0

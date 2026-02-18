@@ -46,6 +46,19 @@ final class SessionRepository {
         saveOrLog()
     }
 
+    func updateSessionLocation(
+        sessionId: UUID,
+        latitude: Double,
+        longitude: Double,
+        placeName: String?
+    ) {
+        guard let session = fetchSession(id: sessionId) else { return }
+        session.latitude = latitude
+        session.longitude = longitude
+        session.placeName = placeName
+        saveOrLog()
+    }
+
     // MARK: - Chunk Lifecycle
 
     func createOrUpdateChunkStarted(

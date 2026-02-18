@@ -214,9 +214,9 @@ struct SettingsView: View {
     private var locationSection: some View {
         Section {
             Toggle(isOn: Binding(
-                get: { container.locationService.isEnabled },
+                get: { LocationPreference.isEnabled },
                 set: { newValue in
-                    container.locationService.isEnabled = newValue
+                    LocationPreference.isEnabled = newValue
                     if newValue {
                         container.locationService.requestPermission()
                     }
@@ -224,10 +224,41 @@ struct SettingsView: View {
             )) {
                 Label("Capture Location", systemImage: "location")
             }
+
+            if LocationPreference.isEnabled {
+                Picker("Accuracy", selection: Binding(
+                    get: { LocationPreference.accuracy },
+                    set: { LocationPreference.accuracy = $0 }
+                )) {
+                    ForEach(LocationPreference.Accuracy.allCases) { level in
+                        Text(level.displayName).tag(level)
+                    }
+                }
+
+                Picker("Capture Timing", selection: Binding(
+                    get: { LocationPreference.captureTiming },
+                    set: { LocationPreference.captureTiming = $0 }
+                )) {
+                    ForEach(LocationPreference.CaptureTiming.allCases) { timing in
+                        Text(timing.displayName).tag(timing)
+                    }
+                }
+
+                Toggle(isOn: Binding(
+                    get: { LocationPreference.reverseGeocodeEnabled },
+                    set: { LocationPreference.reverseGeocodeEnabled = $0 }
+                )) {
+                    Label("Place Name Lookup", systemImage: "map")
+                }
+            }
         } header: {
             Text("Location")
         } footer: {
-            Text("When enabled, the approximate location will be saved when starting a recording. Location data stays on your device.")
+            if LocationPreference.isEnabled {
+                Text("Location data stays on your device. Place Name Lookup uses a brief network request to convert coordinates to a readable name.")
+            } else {
+                Text("When enabled, the approximate location will be saved when starting a recording. Location data stays on your device.")
+            }
         }
     }
 

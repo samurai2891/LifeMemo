@@ -260,6 +260,16 @@ struct SessionDetailView: View {
             )
             .font(.caption)
             .foregroundStyle(.secondary)
+
+            if let placeName = session.placeName, !placeName.isEmpty {
+                Label {
+                    Text(placeName)
+                } icon: {
+                    Image(systemName: "location")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
         }
     }
 

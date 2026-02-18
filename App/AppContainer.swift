@@ -130,12 +130,17 @@ final class AppContainer: ObservableObject {
         let recordingHealthMonitor = RecordingHealthMonitor()
         self.recordingHealthMonitor = recordingHealthMonitor
 
+        // v1.0: Location (initialized before RecordingCoordinator which depends on it)
+        let locationService = LocationService()
+        self.locationService = locationService
+
         self.recordingCoordinator = RecordingCoordinator(
             repository: repository,
             audioSession: audioSession,
             chunkRecorder: chunkRecorder,
             interruptionHandler: audioInterruptionHandler,
-            healthMonitor: recordingHealthMonitor
+            healthMonitor: recordingHealthMonitor,
+            locationService: locationService
         )
 
         // v1.0: Summarization
@@ -208,9 +213,6 @@ final class AppContainer: ObservableObject {
 
         // v1.0: Logging
         self.logExporter = AppLogExporter()
-
-        // v1.0: Location
-        self.locationService = LocationService()
 
         // Wire memory pressure cleanup to Core Data
         memoryPressureMonitor.onShouldCleanup = { [weak coreData] in

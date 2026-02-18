@@ -1,10 +1,10 @@
 import Foundation
 import CoreLocation
-
-// MARK: - LocationService
+import os.log
 
 /// Captures approximate location when a recording starts.
 /// All location data stays on-device. Disabled by default (privacy first).
+/// Reads configuration from LocationPreference (accuracy, timing, reverse geocode).
 @MainActor
 final class LocationService: NSObject, ObservableObject {
 
@@ -14,23 +14,16 @@ final class LocationService: NSObject, ObservableObject {
     @Published private(set) var lastPlaceName: String?
     @Published private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
 
-    // MARK: - UserDefaults Persisted
-
-    var isEnabled: Bool {
-        get { UserDefaults.standard.bool(forKey: "locationCaptureEnabled") }
-        set { UserDefaults.standard.set(newValue, forKey: "locationCaptureEnabled") }
-    }
-
     // MARK: - Private
 
     private let locationManager = CLLocationManager()
+    private let logger = Logger(subsystem: "com.lifememo.app", category: "Location")
 
     // MARK: - Init
 
     override init() {
         super.init()
         locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         authorizationStatus = locationManager.authorizationStatus
     }
 
@@ -40,20 +33,22 @@ final class LocationService: NSObject, ObservableObject {
         locationManager.requestWhenInUseAuthorization()
     }
 
-    /// Capture current location (one-shot). Call when recording starts.
+    /// Capture current location (one-shot). Reads accuracy from LocationPreference.
     func captureCurrentLocation() {
-        guard isEnabled else { return }
+        guard LocationPreference.isEnabled else { return }
         guard authorizationStatus == .authorizedWhenInUse
             || authorizationStatus == .authorizedAlways
         else {
             requestPermission()
             return
         }
+        locationManager.desiredAccuracy = LocationPreference.accuracy.clAccuracy
+        logger.debug("Requesting location with accuracy: \(LocationPreference.accuracy.rawValue)")
         locationManager.requestLocation()
     }
 
     /// Reverse geocode to get a human-readable place name.
-    /// Requires network. Only call if the user has explicitly enabled reverse geocoding.
+    /// Only called when LocationPreference.reverseGeocodeEnabled is true.
     func reverseGeocode(location: CLLocation) async -> String? {
         let geocoder = CLGeocoder()
         do {
@@ -64,7 +59,7 @@ final class LocationService: NSObject, ObservableObject {
                     .joined(separator: ", ")
             }
         } catch {
-            // Geocoding failed - not critical, return nil
+            logger.warning("Reverse geocoding failed: \(error.localizedDescription)")
         }
         return nil
     }
@@ -85,7 +80,16 @@ extension LocationService: CLLocationManagerDelegate {
         didUpdateLocations locations: [CLLocation]
     ) {
         Task { @MainActor in
-            lastLocation = locations.last
+            guard let location = locations.last else { return }
+            lastLocation = location
+            logger.info("Location captured: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+
+            if LocationPreference.reverseGeocodeEnabled {
+                lastPlaceName = await reverseGeocode(location: location)
+                if let name = lastPlaceName {
+                    logger.info("Reverse geocoded: \(name)")
+                }
+            }
         }
     }
 
@@ -93,7 +97,10 @@ extension LocationService: CLLocationManagerDelegate {
         _ manager: CLLocationManager,
         didFailWithError error: Error
     ) {
-        // Location capture failed - not critical for app functionality
+        let desc = error.localizedDescription
+        Task { @MainActor in
+            logger.warning("Location capture failed: \(desc)")
+        }
     }
 
     nonisolated func locationManagerDidChangeAuthorization(
