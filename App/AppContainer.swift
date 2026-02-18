@@ -12,6 +12,7 @@ final class AppContainer: ObservableObject {
 
     let speechPermission: SpeechPermissionService
     let transcriber: OnDeviceTranscriber
+    let speakerDiarizer: SpeakerDiarizer
     let transcriptionQueue: TranscriptionQueueActor
 
     let audioSession: AudioSessionConfigurator
@@ -101,9 +102,13 @@ final class AppContainer: ObservableObject {
         let transcriber = OnDeviceTranscriber()
         self.transcriber = transcriber
 
+        let speakerDiarizer = SpeakerDiarizer()
+        self.speakerDiarizer = speakerDiarizer
+
         let transcriptionQueue = TranscriptionQueueActor(
             repository: repository,
-            transcriber: transcriber
+            transcriber: transcriber,
+            diarizer: speakerDiarizer
         )
         self.transcriptionQueue = transcriptionQueue
 

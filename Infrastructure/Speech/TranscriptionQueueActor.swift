@@ -5,7 +5,7 @@ import Foundation
 /// Chunks are enqueued as they finish recording and processed one at a time
 /// to avoid overloading the on-device speech recognizer. Each job updates
 /// the chunk's transcription status in Core Data, runs the recognizer, and
-/// saves the resulting transcript.
+/// saves the resulting transcript with speaker diarization.
 ///
 /// Processing is deferred while recording is active, under low power mode,
 /// or when thermal state is serious/critical.
@@ -15,6 +15,7 @@ actor TranscriptionQueueActor {
 
     private let repository: SessionRepository
     private let transcriber: OnDeviceTranscriber
+    private let diarizer: SpeakerDiarizer
 
     // MARK: - Queue State
 
@@ -24,9 +25,14 @@ actor TranscriptionQueueActor {
 
     // MARK: - Initializer
 
-    init(repository: SessionRepository, transcriber: OnDeviceTranscriber) {
+    init(
+        repository: SessionRepository,
+        transcriber: OnDeviceTranscriber,
+        diarizer: SpeakerDiarizer
+    ) {
         self.repository = repository
         self.transcriber = transcriber
+        self.diarizer = diarizer
     }
 
     // MARK: - Public API
@@ -113,13 +119,32 @@ actor TranscriptionQueueActor {
         }
 
         do {
-            let text = try await transcriber.transcribeFile(url: fileURL, locale: locale)
+            let detail = try await transcriber.transcribeFileWithSegments(
+                url: fileURL,
+                locale: locale
+            )
+
+            let diarization = diarizer.diarize(
+                audioURL: fileURL,
+                wordSegments: detail.wordSegments
+            )
+
             await MainActor.run {
-                repository.saveTranscript(
-                    sessionId: sessionId,
-                    chunkId: chunkId,
-                    text: text
-                )
+                if diarization.speakerCount > 1 {
+                    repository.saveTranscriptWithSpeakers(
+                        sessionId: sessionId,
+                        chunkId: chunkId,
+                        diarization: diarization,
+                        fullText: detail.formattedString
+                    )
+                } else {
+                    // Single speaker or no diarization → use original path
+                    repository.saveTranscript(
+                        sessionId: sessionId,
+                        chunkId: chunkId,
+                        text: detail.formattedString
+                    )
+                }
                 repository.updateChunkTranscriptionStatus(
                     chunkId: chunkId,
                     status: .done

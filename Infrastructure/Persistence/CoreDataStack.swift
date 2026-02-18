@@ -205,11 +205,17 @@ final class CoreDataStack {
         placeName.attributeType = .stringAttributeType
         placeName.isOptional = true
 
+        let speakerNamesJSON = NSAttributeDescription()
+        speakerNamesJSON.name = "speakerNamesJSON"
+        speakerNamesJSON.attributeType = .stringAttributeType
+        speakerNamesJSON.isOptional = true
+
         entity.properties = [
             id, createdAt, startedAt, endedAt,
             title, languageModeRaw, statusRaw,
             audioKept, summary, bodyText,
-            latitude, longitude, placeName
+            latitude, longitude, placeName,
+            speakerNamesJSON
         ]
         return entity
     }
@@ -308,7 +314,12 @@ final class CoreDataStack {
         originalText.attributeType = .stringAttributeType
         originalText.isOptional = true
 
-        entity.properties = [id, startMs, endMs, text, createdAt, isUserEdited, originalText]
+        let speakerIndex = NSAttributeDescription()
+        speakerIndex.name = "speakerIndex"
+        speakerIndex.attributeType = .integer16AttributeType
+        speakerIndex.defaultValue = Int16(-1)
+
+        entity.properties = [id, startMs, endMs, text, createdAt, isUserEdited, originalText, speakerIndex]
         return entity
     }
 

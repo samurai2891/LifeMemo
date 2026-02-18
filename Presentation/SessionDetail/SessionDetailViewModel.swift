@@ -59,6 +59,11 @@ final class SessionDetailViewModel: ObservableObject {
     @Published var editingSegmentText: String = ""
     @Published private(set) var segments: [SegmentDisplayInfo] = []
 
+    // Speaker Management
+    @Published var showSpeakerManagement: Bool = false
+    @Published private(set) var speakerNames: [Int: String] = [:]
+    @Published private(set) var speakerCount: Int = 0
+
     // Edit History
     @Published private(set) var selectedSegmentHistory: [EditHistoryEntry] = []
     @Published var showingHistoryForSegmentId: UUID?
@@ -126,15 +131,24 @@ final class SessionDetailViewModel: ObservableObject {
         // Body Text
         bodyText = entity.bodyText ?? ""
 
+        // Speaker data
+        speakerNames = entity.speakerNames
+        let allSpeakerIndices = Set(entity.segmentsArray.map { Int($0.speakerIndex) }).filter { $0 >= 0 }
+        speakerCount = allSpeakerIndices.count
+
         // Segments
         segments = entity.segmentsArray.map { seg in
-            SegmentDisplayInfo(
+            let idx = Int(seg.speakerIndex)
+            let name: String? = idx >= 0 ? (speakerNames[idx] ?? SpeakerColors.defaultName(for: idx)) : nil
+            return SegmentDisplayInfo(
                 id: seg.id ?? UUID(),
                 text: seg.text ?? "",
                 startMs: seg.startMs,
                 endMs: seg.endMs,
                 isUserEdited: seg.isUserEdited,
-                originalText: seg.originalText
+                originalText: seg.originalText,
+                speakerIndex: idx,
+                speakerName: name
             )
         }
 
@@ -269,10 +283,19 @@ final class SessionDetailViewModel: ObservableObject {
         self.audioPlayer = player
 
         let controller = SyncedPlaybackController(audioPlayer: player)
-        let segments = entity.segmentsArray.map { seg in
-            (id: seg.id ?? UUID(), startMs: seg.startMs, endMs: seg.endMs, text: seg.text ?? "")
+        let playbackSegments = entity.segmentsArray.map { seg in
+            let idx = Int(seg.speakerIndex)
+            let name: String? = idx >= 0 ? (speakerNames[idx] ?? SpeakerColors.defaultName(for: idx)) : nil
+            return (
+                id: seg.id ?? UUID(),
+                startMs: seg.startMs,
+                endMs: seg.endMs,
+                text: seg.text ?? "",
+                speakerIndex: idx,
+                speakerName: name
+            )
         }
-        controller.loadSegments(segments)
+        controller.loadSegments(playbackSegments)
         self.playbackController = controller
     }
 
@@ -353,18 +376,38 @@ final class SessionDetailViewModel: ObservableObject {
 
     private func reloadSegmentsFromEntity() {
         if let entity = repository.fetchSession(id: sessionId) {
+            speakerNames = entity.speakerNames
+            let allSpeakerIndices = Set(entity.segmentsArray.map { Int($0.speakerIndex) }).filter { $0 >= 0 }
+            speakerCount = allSpeakerIndices.count
+
             segments = entity.segmentsArray.map { seg in
-                SegmentDisplayInfo(
+                let idx = Int(seg.speakerIndex)
+                let name: String? = idx >= 0 ? (speakerNames[idx] ?? SpeakerColors.defaultName(for: idx)) : nil
+                return SegmentDisplayInfo(
                     id: seg.id ?? UUID(),
                     text: seg.text ?? "",
                     startMs: seg.startMs,
                     endMs: seg.endMs,
                     isUserEdited: seg.isUserEdited,
-                    originalText: seg.originalText
+                    originalText: seg.originalText,
+                    speakerIndex: idx,
+                    speakerName: name
                 )
             }
             transcript = repository.getFullTranscriptText(sessionId: sessionId)
         }
+    }
+
+    // MARK: - Speaker Management
+
+    func renameSpeaker(index: Int, newName: String) {
+        repository.renameSpeaker(sessionId: sessionId, speakerIndex: index, newName: newName)
+        reloadSegmentsFromEntity()
+    }
+
+    func reassignSegmentSpeaker(segmentId: UUID, newSpeakerIndex: Int) {
+        repository.reassignSegmentSpeaker(segmentId: segmentId, newSpeakerIndex: newSpeakerIndex)
+        reloadSegmentsFromEntity()
     }
 }
 
@@ -377,6 +420,8 @@ struct SegmentDisplayInfo: Identifiable {
     let endMs: Int64
     let isUserEdited: Bool
     let originalText: String?
+    let speakerIndex: Int       // -1 = undiarized
+    let speakerName: String?    // Custom or default name; nil when undiarized
 }
 
 // MARK: - Chunk Display Info

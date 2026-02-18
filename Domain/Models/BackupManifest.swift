@@ -11,7 +11,7 @@ struct BackupManifest: Codable {
     let sessions: [SessionBackup]
     let audioFiles: [AudioFileEntry]
 
-    static let currentVersion = 2
+    static let currentVersion = 3
 
     struct SessionBackup: Codable {
         let id: UUID
@@ -24,9 +24,53 @@ struct BackupManifest: Codable {
         let audioKept: Bool
         let summary: String?
         let bodyText: String?
+        let speakerNamesJSON: String?
         let chunks: [ChunkBackup]
         let segments: [SegmentBackup]
         let highlights: [HighlightBackup]
+
+        /// Backward-compatible decoding: older backups without speakerNamesJSON.
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(UUID.self, forKey: .id)
+            title = try container.decode(String.self, forKey: .title)
+            createdAt = try container.decode(Date.self, forKey: .createdAt)
+            startedAt = try container.decode(Date.self, forKey: .startedAt)
+            endedAt = try container.decodeIfPresent(Date.self, forKey: .endedAt)
+            languageModeRaw = try container.decode(String.self, forKey: .languageModeRaw)
+            statusRaw = try container.decode(Int16.self, forKey: .statusRaw)
+            audioKept = try container.decode(Bool.self, forKey: .audioKept)
+            summary = try container.decodeIfPresent(String.self, forKey: .summary)
+            bodyText = try container.decodeIfPresent(String.self, forKey: .bodyText)
+            speakerNamesJSON = try container.decodeIfPresent(String.self, forKey: .speakerNamesJSON)
+            chunks = try container.decode([ChunkBackup].self, forKey: .chunks)
+            segments = try container.decode([SegmentBackup].self, forKey: .segments)
+            highlights = try container.decode([HighlightBackup].self, forKey: .highlights)
+        }
+
+        init(
+            id: UUID, title: String, createdAt: Date, startedAt: Date,
+            endedAt: Date?, languageModeRaw: String, statusRaw: Int16,
+            audioKept: Bool, summary: String?, bodyText: String?,
+            speakerNamesJSON: String?,
+            chunks: [ChunkBackup], segments: [SegmentBackup],
+            highlights: [HighlightBackup]
+        ) {
+            self.id = id
+            self.title = title
+            self.createdAt = createdAt
+            self.startedAt = startedAt
+            self.endedAt = endedAt
+            self.languageModeRaw = languageModeRaw
+            self.statusRaw = statusRaw
+            self.audioKept = audioKept
+            self.summary = summary
+            self.bodyText = bodyText
+            self.speakerNamesJSON = speakerNamesJSON
+            self.chunks = chunks
+            self.segments = segments
+            self.highlights = highlights
+        }
     }
 
     struct ChunkBackup: Codable {
@@ -48,10 +92,11 @@ struct BackupManifest: Codable {
         let text: String
         let isUserEdited: Bool
         let originalText: String?
+        let speakerIndex: Int16
         let createdAt: Date
         let editHistory: [EditHistoryBackup]
 
-        /// Backward-compatible decoding: older backups without editHistory default to empty array.
+        /// Backward-compatible decoding: older backups without editHistory/speakerIndex.
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             id = try container.decode(UUID.self, forKey: .id)
@@ -60,6 +105,7 @@ struct BackupManifest: Codable {
             text = try container.decode(String.self, forKey: .text)
             isUserEdited = try container.decode(Bool.self, forKey: .isUserEdited)
             originalText = try container.decodeIfPresent(String.self, forKey: .originalText)
+            speakerIndex = try container.decodeIfPresent(Int16.self, forKey: .speakerIndex) ?? -1
             createdAt = try container.decode(Date.self, forKey: .createdAt)
             editHistory = try container.decodeIfPresent([EditHistoryBackup].self, forKey: .editHistory) ?? []
         }
@@ -71,6 +117,7 @@ struct BackupManifest: Codable {
             text: String,
             isUserEdited: Bool,
             originalText: String?,
+            speakerIndex: Int16,
             createdAt: Date,
             editHistory: [EditHistoryBackup]
         ) {
@@ -80,6 +127,7 @@ struct BackupManifest: Codable {
             self.text = text
             self.isUserEdited = isUserEdited
             self.originalText = originalText
+            self.speakerIndex = speakerIndex
             self.createdAt = createdAt
             self.editHistory = editHistory
         }

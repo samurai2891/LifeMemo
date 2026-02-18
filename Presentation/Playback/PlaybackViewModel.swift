@@ -64,9 +64,19 @@ final class PlaybackViewModel: ObservableObject {
         hasAudio = true
         audioPlayer.loadSession(chunks: chunks)
 
-        // Load transcript segments
+        // Load transcript segments with speaker data
+        let speakerNames = session.speakerNames
         let segments = session.segmentsArray.map { seg in
-            (id: seg.id ?? UUID(), startMs: seg.startMs, endMs: seg.endMs, text: seg.text ?? "")
+            let idx = Int(seg.speakerIndex)
+            let name: String? = idx >= 0 ? (speakerNames[idx] ?? SpeakerColors.defaultName(for: idx)) : nil
+            return (
+                id: seg.id ?? UUID(),
+                startMs: seg.startMs,
+                endMs: seg.endMs,
+                text: seg.text ?? "",
+                speakerIndex: idx,
+                speakerName: name
+            )
         }
         controller.loadSegments(segments)
 

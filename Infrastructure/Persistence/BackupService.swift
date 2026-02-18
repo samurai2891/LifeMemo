@@ -81,6 +81,7 @@ final class BackupService: ObservableObject {
                     text: seg.text ?? "",
                     isUserEdited: seg.isUserEdited,
                     originalText: seg.originalText,
+                    speakerIndex: seg.speakerIndex,
                     createdAt: seg.createdAt ?? Date(),
                     editHistory: historyBackups
                 )
@@ -105,7 +106,8 @@ final class BackupService: ObservableObject {
                 statusRaw: session.statusRaw,
                 audioKept: session.audioKept,
                 summary: session.summary,
-                bodyText: nil,
+                bodyText: session.bodyText,
+                speakerNamesJSON: session.speakerNamesJSON,
                 chunks: chunks,
                 segments: segments,
                 highlights: highlights

@@ -173,18 +173,43 @@ struct PlaybackView: View {
                 .foregroundStyle(segment.isActive ? Color.accentColor : .secondary)
                 .frame(width: 44, alignment: .trailing)
 
-            // Text
-            Text(segment.text)
-                .font(.body)
-                .foregroundStyle(segment.isActive ? .primary : .secondary)
-                .padding(.vertical, 6)
-                .padding(.horizontal, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(segment.isActive ? Color.accentColor.opacity(0.12) : Color.clear)
-                )
-                .animation(.easeInOut(duration: 0.2), value: segment.isActive)
+            HStack(alignment: .top, spacing: 0) {
+                // Speaker accent line
+                if segment.speakerIndex >= 0 {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(SpeakerColors.color(for: segment.speakerIndex))
+                        .frame(width: 2)
+                        .padding(.trailing, 6)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    // Speaker label
+                    if let name = segment.speakerName, segment.speakerIndex >= 0 {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(SpeakerColors.color(for: segment.speakerIndex))
+                                .frame(width: 6, height: 6)
+
+                            Text(name)
+                                .font(.caption2.bold())
+                                .foregroundStyle(SpeakerColors.color(for: segment.speakerIndex))
+                        }
+                    }
+
+                    // Text
+                    Text(segment.text)
+                        .font(.body)
+                        .foregroundStyle(segment.isActive ? .primary : .secondary)
+                }
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(segment.isActive ? Color.accentColor.opacity(0.12) : Color.clear)
+            )
+            .animation(.easeInOut(duration: 0.2), value: segment.isActive)
         }
     }
 
