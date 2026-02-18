@@ -22,9 +22,9 @@ final class SummarizationBenchmarkTests: XCTestCase {
         XCTAssertEqual(SummarizationBenchmark.InputSize.allCases.count, 4)
     }
 
-    func testRunSingleSmallTFIDF() async {
+    func testRunSingleSmallTFIDF() {
         let benchmark = SummarizationBenchmark()
-        let result = await benchmark.runSingle(size: .small, algorithm: .tfidf)
+        let result = benchmark.runSingle(size: .small, algorithm: .tfidf)
         XCTAssertGreaterThan(result.wordCount, 0)
         XCTAssertGreaterThan(result.processingTimeMs, 0)
         XCTAssertGreaterThan(result.sentenceCount, 0)
@@ -32,16 +32,16 @@ final class SummarizationBenchmarkTests: XCTestCase {
         XCTAssertEqual(result.algorithm, .tfidf)
     }
 
-    func testRunSingleSmallTextRank() async {
+    func testRunSingleSmallTextRank() {
         let benchmark = SummarizationBenchmark()
-        let result = await benchmark.runSingle(size: .small, algorithm: .textRank)
+        let result = benchmark.runSingle(size: .small, algorithm: .textRank)
         XCTAssertGreaterThan(result.wordCount, 0)
         XCTAssertEqual(result.algorithm, .textRank)
     }
 
-    func testRunSingleSmallLeadBased() async {
+    func testRunSingleSmallLeadBased() {
         let benchmark = SummarizationBenchmark()
-        let result = await benchmark.runSingle(size: .small, algorithm: .leadBased)
+        let result = benchmark.runSingle(size: .small, algorithm: .leadBased)
         XCTAssertGreaterThan(result.wordCount, 0)
         XCTAssertEqual(result.algorithm, .leadBased)
     }
@@ -78,9 +78,9 @@ final class SummarizationBenchmarkTests: XCTestCase {
         XCTAssertEqual(result.wordsPerSecond, 0)
     }
 
-    func testDefaultAlgorithmIsTFIDF() async {
+    func testDefaultAlgorithmIsTFIDF() {
         let benchmark = SummarizationBenchmark()
-        let result = await benchmark.runSingle(size: .small)
+        let result = benchmark.runSingle(size: .small)
         XCTAssertEqual(result.algorithm, .tfidf)
     }
 }

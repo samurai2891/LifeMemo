@@ -64,7 +64,7 @@ final class SummarizationBenchmark: ObservableObject {
         for algorithm in SummarizationAlgorithm.allCases {
             for size in InputSize.allCases {
                 currentTest = "Testing \(algorithm.displayName) \(size.rawValue)..."
-                let result = await runSingle(size: size, algorithm: algorithm)
+                let result = runSingle(size: size, algorithm: algorithm)
                 results.append(result)
                 logger.info(
                     "Benchmark \(algorithm.displayName) \(size.rawValue): \(result.processingTimeMs, format: .fixed(precision: 1))ms, \(result.wordsPerSecond, format: .fixed(precision: 0)) words/sec"
@@ -77,7 +77,7 @@ final class SummarizationBenchmark: ObservableObject {
     }
 
     /// Run benchmark for a single algorithm and input size.
-    func runSingle(size: InputSize, algorithm: SummarizationAlgorithm = .tfidf) async -> BenchmarkResult {
+    func runSingle(size: InputSize, algorithm: SummarizationAlgorithm = .tfidf) -> BenchmarkResult {
         let text = generateTestText(wordCount: size.approximateWordCount)
         let memBefore = currentMemoryMB()
         let thermal = thermalStateString()
