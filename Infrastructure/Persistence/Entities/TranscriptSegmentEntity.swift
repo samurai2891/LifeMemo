@@ -10,6 +10,7 @@ public class TranscriptSegmentEntity: NSManagedObject {
     @NSManaged public var createdAt: Date?
     @NSManaged public var isUserEdited: Bool
     @NSManaged public var originalText: String?
+    @NSManaged public var speakerIndex: Int16  // -1 = undiarized (legacy), 0+ = speaker
     @NSManaged public var session: SessionEntity?
     @NSManaged public var chunk: ChunkEntity?
     @NSManaged public var editHistory: NSSet?

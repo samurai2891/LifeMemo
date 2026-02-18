@@ -14,6 +14,8 @@ final class SyncedPlaybackController: ObservableObject {
         let startMs: Int64
         let endMs: Int64
         let text: String
+        let speakerIndex: Int
+        let speakerName: String?
         var isActive: Bool
     }
 
@@ -32,9 +34,19 @@ final class SyncedPlaybackController: ObservableObject {
 
     // MARK: - Setup
 
-    func loadSegments(_ rawSegments: [(id: UUID, startMs: Int64, endMs: Int64, text: String)]) {
+    func loadSegments(
+        _ rawSegments: [(id: UUID, startMs: Int64, endMs: Int64, text: String, speakerIndex: Int, speakerName: String?)]
+    ) {
         allSegments = rawSegments.map {
-            SegmentDisplay(id: $0.id, startMs: $0.startMs, endMs: $0.endMs, text: $0.text, isActive: false)
+            SegmentDisplay(
+                id: $0.id,
+                startMs: $0.startMs,
+                endMs: $0.endMs,
+                text: $0.text,
+                speakerIndex: $0.speakerIndex,
+                speakerName: $0.speakerName,
+                isActive: false
+            )
         }.sorted { $0.startMs < $1.startMs }
 
         segments = allSegments

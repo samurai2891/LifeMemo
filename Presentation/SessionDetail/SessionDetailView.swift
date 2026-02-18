@@ -79,6 +79,11 @@ struct SessionDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $viewModel.showSpeakerManagement, onDismiss: {
+            viewModel.loadSession()
+        }) {
+            SpeakerManagementSheet(viewModel: viewModel)
+        }
         .sheet(isPresented: $viewModel.showTagPicker, onDismiss: {
             viewModel.loadSession()
         }) {
@@ -560,8 +565,23 @@ struct SessionDetailView: View {
 
     private var segmentTranscriptSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Transcript", systemImage: "text.alignleft")
-                .font(.headline)
+            HStack {
+                Label("Transcript", systemImage: "text.alignleft")
+                    .font(.headline)
+
+                Spacer()
+
+                if viewModel.speakerCount > 1 {
+                    Button {
+                        viewModel.showSpeakerManagement = true
+                    } label: {
+                        Label("Speakers", systemImage: "person.2")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
 
             if viewModel.segments.isEmpty {
                 Text("No transcript available yet.")
@@ -570,8 +590,8 @@ struct SessionDetailView: View {
                     .italic()
             } else {
                 LazyVStack(spacing: 8) {
-                    ForEach(viewModel.segments) { segment in
-                        segmentRow(segment)
+                    ForEach(Array(viewModel.segments.enumerated()), id: \.element.id) { index, segment in
+                        segmentRow(segment, previousSpeakerIndex: index > 0 ? viewModel.segments[index - 1].speakerIndex : nil)
                     }
                 }
             }
@@ -579,15 +599,37 @@ struct SessionDetailView: View {
     }
 
     @ViewBuilder
-    private func segmentRow(_ segment: SegmentDisplayInfo) -> some View {
+    private func segmentRow(_ segment: SegmentDisplayInfo, previousSpeakerIndex: Int? = nil) -> some View {
         let isEditing = viewModel.editingSegmentId == segment.id
+        let showSpeakerLabel = segment.speakerIndex >= 0 && segment.speakerIndex != previousSpeakerIndex
 
-        VStack(alignment: .leading, spacing: 6) {
-            // Timestamp and badges
-            HStack(spacing: 8) {
-                Text(formatMs(segment.startMs))
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(Color.accentColor)
+        HStack(alignment: .top, spacing: 0) {
+            // Speaker accent line
+            if segment.speakerIndex >= 0 {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(SpeakerColors.color(for: segment.speakerIndex))
+                    .frame(width: 2)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                // Speaker label (only shown on speaker change)
+                if showSpeakerLabel, let name = segment.speakerName {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(SpeakerColors.color(for: segment.speakerIndex))
+                            .frame(width: 8, height: 8)
+
+                        Text(name)
+                            .font(.caption2.bold())
+                            .foregroundStyle(SpeakerColors.color(for: segment.speakerIndex))
+                    }
+                }
+
+                // Timestamp and badges
+                HStack(spacing: 8) {
+                    Text(formatMs(segment.startMs))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(Color.accentColor)
 
                 if segment.isUserEdited {
                     Text("edited")
@@ -681,9 +723,10 @@ struct SessionDetailView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+                }
             }
+            .padding(10)
         }
-        .padding(10)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }

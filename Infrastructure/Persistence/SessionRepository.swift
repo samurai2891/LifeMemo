@@ -138,6 +138,61 @@ final class SessionRepository {
         saveOrLog()
     }
 
+    /// Saves diarized transcript segments for a chunk (multiple segments per chunk).
+    ///
+    /// Each `DiarizedSegment` becomes a separate `TranscriptSegmentEntity` with the
+    /// appropriate `speakerIndex`. The chunk's session-relative offset is applied
+    /// to each segment's timestamps.
+    func saveTranscriptWithSpeakers(
+        sessionId: UUID,
+        chunkId: UUID,
+        diarization: DiarizationResult,
+        fullText: String
+    ) {
+        guard let session = fetchSession(id: sessionId),
+              let chunk = fetchChunk(id: chunkId) else { return }
+
+        let chunkStartAt = chunk.startAt ?? Date()
+        let sessionStartedAt = session.startedAt ?? Date()
+        let chunkOffsetMs = Int64(chunkStartAt.timeIntervalSince(sessionStartedAt) * 1000)
+
+        for diarizedSeg in diarization.segments {
+            let segment = TranscriptSegmentEntity(context: context)
+            segment.id = UUID()
+            segment.text = diarizedSeg.text
+            segment.startMs = max(0, chunkOffsetMs + diarizedSeg.startOffsetMs)
+            segment.endMs = max(0, chunkOffsetMs + diarizedSeg.endOffsetMs)
+            segment.speakerIndex = Int16(diarizedSeg.speakerIndex)
+            segment.createdAt = Date()
+            segment.session = session
+            segment.chunk = chunk
+        }
+
+        chunk.transcriptionStatus = .done
+        saveOrLog()
+    }
+
+    /// Updates the display name for a speaker in a session.
+    func renameSpeaker(sessionId: UUID, speakerIndex: Int, newName: String) {
+        guard let session = fetchSession(id: sessionId) else { return }
+        var names = session.speakerNames
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            names.removeValue(forKey: speakerIndex)
+        } else {
+            names[speakerIndex] = trimmed
+        }
+        session.setSpeakerNames(names)
+        saveOrLog()
+    }
+
+    /// Reassigns a segment to a different speaker.
+    func reassignSegmentSpeaker(segmentId: UUID, newSpeakerIndex: Int) {
+        guard let segment = fetchSegment(id: segmentId) else { return }
+        segment.speakerIndex = Int16(newSpeakerIndex)
+        saveOrLog()
+    }
+
     func getLocaleForSession(sessionId: UUID) -> Locale {
         guard let session = fetchSession(id: sessionId) else {
             return Locale.current
@@ -609,6 +664,8 @@ final class SessionRepository {
             chunk.session = session
         }
 
+        session.speakerNamesJSON = backup.speakerNamesJSON
+
         for segmentBackup in backup.segments {
             let segment = TranscriptSegmentEntity(context: context)
             segment.id = segmentBackup.id
@@ -617,6 +674,7 @@ final class SessionRepository {
             segment.text = segmentBackup.text
             segment.isUserEdited = segmentBackup.isUserEdited
             segment.originalText = segmentBackup.originalText
+            segment.speakerIndex = segmentBackup.speakerIndex
             segment.createdAt = segmentBackup.createdAt
             segment.session = session
 

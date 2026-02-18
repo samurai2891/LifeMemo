@@ -20,6 +20,7 @@ final class BackupManifestTests: XCTestCase {
                     audioKept: true,
                     summary: "A test summary",
                     bodyText: "Some notes",
+                    speakerNamesJSON: nil,
                     chunks: [],
                     segments: [],
                     highlights: []
@@ -41,6 +42,6 @@ final class BackupManifestTests: XCTestCase {
     }
 
     func testCurrentVersion() {
-        XCTAssertEqual(BackupManifest.currentVersion, 2)
+        XCTAssertEqual(BackupManifest.currentVersion, 3)
     }
 }

@@ -16,6 +16,7 @@ public class SessionEntity: NSManagedObject {
     @NSManaged public var latitude: Double
     @NSManaged public var longitude: Double
     @NSManaged public var placeName: String?
+    @NSManaged public var speakerNamesJSON: String?  // e.g. {"0":"Taro","1":"Hanako"}
     @NSManaged public var chunks: NSSet?
     @NSManaged public var segments: NSSet?
     @NSManaged public var highlights: NSSet?
@@ -57,6 +58,31 @@ extension SessionEntity {
 
     var hasLocation: Bool {
         latitude != 0 || longitude != 0
+    }
+
+    /// Decoded speaker name mapping (speakerIndex -> custom name).
+    var speakerNames: [Int: String] {
+        guard let json = speakerNamesJSON,
+              let data = json.data(using: .utf8),
+              let dict = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return [:]
+        }
+        var result: [Int: String] = [:]
+        for (key, value) in dict {
+            if let index = Int(key) {
+                result[index] = value
+            }
+        }
+        return result
+    }
+
+    /// Encodes and stores the speaker name mapping.
+    func setSpeakerNames(_ names: [Int: String]) {
+        let stringKeyed = Dictionary(uniqueKeysWithValues: names.map { (String($0.key), $0.value) })
+        if let data = try? JSONEncoder().encode(stringKeyed),
+           let json = String(data: data, encoding: .utf8) {
+            speakerNamesJSON = json
+        }
     }
 
     func toSummary() -> SessionSummary {
