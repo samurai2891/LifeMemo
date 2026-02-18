@@ -162,9 +162,17 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
               let sid = sessionId,
               let chunkId = currentChunkId else { return }
 
+        // Clear immediately to prevent double-finalize from stop()/rotate() race
+        currentChunkId = nil
+
         rec.stop()
 
         let fileURL = rec.url
+
+        // Escalate from recording protection to at-rest protection (P0-03).
+        // The file is fully written; no further writes needed.
+        fileStore.setAtRestProtection(at: fileURL)
+
         let endAt = Date()
         let duration = rec.currentTime
         let fileSize = Self.fileSize(at: fileURL)

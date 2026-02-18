@@ -14,21 +14,51 @@ struct LifeMemoApp: App {
                 .environmentObject(container.speechPermission)
                 .environmentObject(container.appLockManager)
                 .overlay {
-                    // App Switcher privacy mask
-                    if container.appLockManager.isLocked && container.appLockManager.isEnabled {
-                        Color(.systemBackground)
-                            .ignoresSafeArea()
+                    // P1-02: Unconditional privacy screen for App Switcher.
+                    // Separate from App Lock — activates even when App Lock is disabled
+                    // so the App Switcher thumbnail never reveals content.
+                    if container.exposureGuard.isPrivacyScreenVisible {
+                        PrivacyOverlayView()
+                            .transition(.opacity)
                     }
                 }
         }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
-            case .background, .inactive:
+            case .inactive, .background:
+                container.exposureGuard.handleScenePhase(
+                    newPhase == .inactive ? .inactive : .background
+                )
                 container.appLockManager.lock()
             case .active:
-                break
+                container.exposureGuard.handleScenePhase(.active)
+                container.exposureGuard.auditExposureVectors()
             @unknown default:
                 break
+            }
+        }
+    }
+}
+
+// MARK: - Privacy Overlay
+
+/// Opaque overlay shown in App Switcher to prevent content leakage.
+/// Displays only the app icon and name — no recordings, transcripts, or session data.
+private struct PrivacyOverlayView: View {
+
+    var body: some View {
+        ZStack {
+            Color(.systemBackground)
+                .ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                Image(systemName: "waveform.circle.fill")
+                    .font(.system(size: 56))
+                    .foregroundStyle(Color.accentColor)
+
+                Text("LifeMemo")
+                    .font(.title2.bold())
+                    .foregroundStyle(.primary)
             }
         }
     }

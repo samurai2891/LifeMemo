@@ -55,6 +55,7 @@ final class AppContainer: ObservableObject {
     // MARK: - v1.0: Security
 
     let appLockManager: AppLockManager
+    let exposureGuard: ExposureGuard
 
     // MARK: - v1.0: Backup
 
@@ -181,6 +182,8 @@ final class AppContainer: ObservableObject {
 
         // v1.0: Security
         self.appLockManager = AppLockManager()
+        let exposureGuard = ExposureGuard()
+        self.exposureGuard = exposureGuard
 
         // v1.0: Backup
         self.backupService = BackupService(
@@ -208,5 +211,8 @@ final class AppContainer: ObservableObject {
 
         // Check storage limits on launch
         storageLimitManager.checkAndEnforce()
+
+        // P1-02: Enforce zero external exposure on every launch
+        exposureGuard.enforceOnLaunch()
     }
 }

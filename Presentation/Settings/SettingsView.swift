@@ -14,7 +14,8 @@ struct SettingsView: View {
     init(container: AppContainer) {
         _viewModel = StateObject(
             wrappedValue: SettingsViewModel(
-                permissionService: container.speechPermission
+                permissionService: container.speechPermission,
+                capabilityChecker: container.transcriptionCapabilityChecker
             )
         )
     }
