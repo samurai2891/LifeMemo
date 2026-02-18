@@ -12,4 +12,14 @@ public class TranscriptSegmentEntity: NSManagedObject {
     @NSManaged public var originalText: String?
     @NSManaged public var session: SessionEntity?
     @NSManaged public var chunk: ChunkEntity?
+    @NSManaged public var editHistory: NSSet?
+}
+
+extension TranscriptSegmentEntity {
+
+    /// Edit history entries sorted by editIndex ascending.
+    var editHistoryArray: [EditHistoryEntity] {
+        let set = editHistory as? Set<EditHistoryEntity> ?? []
+        return set.sorted { $0.editIndex < $1.editIndex }
+    }
 }

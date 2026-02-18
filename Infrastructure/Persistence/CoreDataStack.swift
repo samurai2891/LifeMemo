@@ -49,7 +49,9 @@ final class CoreDataStack {
 
     // MARK: - Programmatic Model
 
-    static func createManagedObjectModel() -> NSManagedObjectModel {
+    /// Cached model to prevent duplicate `NSManagedObjectModel` registrations
+    /// which cause "Failed to find a unique match" errors in Core Data.
+    private static let cachedModel: NSManagedObjectModel = {
         let model = NSManagedObjectModel()
 
         let sessionEntity = makeSessionEntity()
@@ -58,6 +60,7 @@ final class CoreDataStack {
         let highlightEntity = makeHighlightEntity()
         let tagEntity = makeTagEntity()
         let folderEntity = makeFolderEntity()
+        let editHistoryEntity = makeEditHistoryEntity()
 
         configureRelationships(
             session: sessionEntity,
@@ -65,12 +68,49 @@ final class CoreDataStack {
             segment: segmentEntity,
             highlight: highlightEntity,
             tag: tagEntity,
-            folder: folderEntity
+            folder: folderEntity,
+            editHistory: editHistoryEntity
         )
 
         model.entities = [
             sessionEntity, chunkEntity, segmentEntity,
-            highlightEntity, tagEntity, folderEntity
+            highlightEntity, tagEntity, folderEntity,
+            editHistoryEntity
+        ]
+        return model
+    }()
+
+    static func createManagedObjectModel() -> NSManagedObjectModel {
+        cachedModel
+    }
+
+    /// Creates a fresh (non-cached) model for test use.
+    /// Avoids entity-class registration conflicts with the host app's model.
+    static func createTestModel() -> NSManagedObjectModel {
+        let model = NSManagedObjectModel()
+
+        let sessionEntity = makeSessionEntity()
+        let chunkEntity = makeChunkEntity()
+        let segmentEntity = makeSegmentEntity()
+        let highlightEntity = makeHighlightEntity()
+        let tagEntity = makeTagEntity()
+        let folderEntity = makeFolderEntity()
+        let editHistoryEntity = makeEditHistoryEntity()
+
+        configureRelationships(
+            session: sessionEntity,
+            chunk: chunkEntity,
+            segment: segmentEntity,
+            highlight: highlightEntity,
+            tag: tagEntity,
+            folder: folderEntity,
+            editHistory: editHistoryEntity
+        )
+
+        model.entities = [
+            sessionEntity, chunkEntity, segmentEntity,
+            highlightEntity, tagEntity, folderEntity,
+            editHistoryEntity
         ]
         return model
     }
@@ -342,6 +382,38 @@ final class CoreDataStack {
         return entity
     }
 
+    private static func makeEditHistoryEntity() -> NSEntityDescription {
+        let entity = NSEntityDescription()
+        entity.name = "EditHistoryEntity"
+        entity.managedObjectClassName = "EditHistoryEntity"
+
+        let id = NSAttributeDescription()
+        id.name = "id"
+        id.attributeType = .UUIDAttributeType
+
+        let previousText = NSAttributeDescription()
+        previousText.name = "previousText"
+        previousText.attributeType = .stringAttributeType
+        previousText.defaultValue = ""
+
+        let newText = NSAttributeDescription()
+        newText.name = "newText"
+        newText.attributeType = .stringAttributeType
+        newText.defaultValue = ""
+
+        let editedAt = NSAttributeDescription()
+        editedAt.name = "editedAt"
+        editedAt.attributeType = .dateAttributeType
+
+        let editIndex = NSAttributeDescription()
+        editIndex.name = "editIndex"
+        editIndex.attributeType = .integer16AttributeType
+        editIndex.defaultValue = Int16(0)
+
+        entity.properties = [id, previousText, newText, editedAt, editIndex]
+        return entity
+    }
+
     // MARK: - Relationships
 
     private static func configureRelationships(
@@ -350,7 +422,8 @@ final class CoreDataStack {
         segment: NSEntityDescription,
         highlight: NSEntityDescription,
         tag: NSEntityDescription,
-        folder: NSEntityDescription
+        folder: NSEntityDescription,
+        editHistory: NSEntityDescription
     ) {
         // Session <-> Chunks (one-to-many, cascade)
         let sessionToChunks = NSRelationshipDescription()
@@ -450,15 +523,32 @@ final class CoreDataStack {
         sessionToFolder.inverseRelationship = folderToSessions
         folderToSessions.inverseRelationship = sessionToFolder
 
+        // Segment <-> EditHistory (one-to-many, cascade)
+        let segmentToEditHistory = NSRelationshipDescription()
+        segmentToEditHistory.name = "editHistory"
+        segmentToEditHistory.destinationEntity = editHistory
+        segmentToEditHistory.deleteRule = .cascadeDeleteRule
+        segmentToEditHistory.isOptional = true
+
+        let editHistoryToSegment = NSRelationshipDescription()
+        editHistoryToSegment.name = "segment"
+        editHistoryToSegment.destinationEntity = segment
+        editHistoryToSegment.deleteRule = .nullifyDeleteRule
+        editHistoryToSegment.maxCount = 1
+
+        segmentToEditHistory.inverseRelationship = editHistoryToSegment
+        editHistoryToSegment.inverseRelationship = segmentToEditHistory
+
         // Append relationship properties to entities
         session.properties += [
             sessionToChunks, sessionToSegments, sessionToHighlights,
             sessionToTags, sessionToFolder
         ]
         chunk.properties += [chunkToSession, chunkToSegments]
-        segment.properties += [segmentToSession, segmentToChunk]
+        segment.properties += [segmentToSession, segmentToChunk, segmentToEditHistory]
         highlight.properties += [highlightToSession]
         tag.properties += [tagToSessions]
         folder.properties += [folderToSessions]
+        editHistory.properties += [editHistoryToSegment]
     }
 }

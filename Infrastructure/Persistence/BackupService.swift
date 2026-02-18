@@ -65,14 +65,24 @@ final class BackupService: ObservableObject {
             }
 
             let segments = session.segmentsArray.map { seg in
-                BackupManifest.SegmentBackup(
+                let historyBackups = seg.editHistoryArray.map { entry in
+                    BackupManifest.EditHistoryBackup(
+                        id: entry.id ?? UUID(),
+                        previousText: entry.previousText ?? "",
+                        newText: entry.newText ?? "",
+                        editedAt: entry.editedAt ?? Date(),
+                        editIndex: entry.editIndex
+                    )
+                }
+                return BackupManifest.SegmentBackup(
                     id: seg.id ?? UUID(),
                     startMs: seg.startMs,
                     endMs: seg.endMs,
                     text: seg.text ?? "",
-                    isUserEdited: false,
-                    originalText: nil,
-                    createdAt: seg.createdAt ?? Date()
+                    isUserEdited: seg.isUserEdited,
+                    originalText: seg.originalText,
+                    createdAt: seg.createdAt ?? Date(),
+                    editHistory: historyBackups
                 )
             }
 

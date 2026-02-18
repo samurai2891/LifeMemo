@@ -97,6 +97,26 @@ struct SessionDetailView: View {
                 repository: viewModel.repository
             )
         }
+        .sheet(
+            isPresented: Binding<Bool>(
+                get: { viewModel.showingHistoryForSegmentId != nil },
+                set: { showing in
+                    if !showing { viewModel.dismissEditHistory() }
+                }
+            ),
+            onDismiss: {
+                viewModel.loadSession()
+            }
+        ) {
+            if let segmentId = viewModel.showingHistoryForSegmentId,
+               let segment = viewModel.segments.first(where: { $0.id == segmentId }) {
+                EditHistoryView(
+                    viewModel: viewModel,
+                    segmentText: segment.text,
+                    originalText: segment.originalText
+                )
+            }
+        }
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") { viewModel.errorMessage = nil }
         } message: {
@@ -549,11 +569,33 @@ struct SessionDetailView: View {
                         .background(Color.orange.opacity(0.15))
                         .foregroundStyle(.orange)
                         .clipShape(Capsule())
+
+                    let count = viewModel.editCount(for: segment.id)
+                    if count > 0 {
+                        Text("\(count) edit\(count == 1 ? "" : "s")")
+                            .font(.system(size: 9, weight: .semibold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.accentColor.opacity(0.12))
+                            .foregroundStyle(Color.accentColor)
+                            .clipShape(Capsule())
+                    }
                 }
 
                 Spacer()
 
                 if !isEditing {
+                    if segment.isUserEdited {
+                        Button {
+                            viewModel.loadEditHistory(for: segment.id)
+                        } label: {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     Button {
                         viewModel.beginSegmentEdit(segment)
                     } label: {

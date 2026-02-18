@@ -11,7 +11,7 @@ struct BackupManifest: Codable {
     let sessions: [SessionBackup]
     let audioFiles: [AudioFileEntry]
 
-    static let currentVersion = 1
+    static let currentVersion = 2
 
     struct SessionBackup: Codable {
         let id: UUID
@@ -49,6 +49,48 @@ struct BackupManifest: Codable {
         let isUserEdited: Bool
         let originalText: String?
         let createdAt: Date
+        let editHistory: [EditHistoryBackup]
+
+        /// Backward-compatible decoding: older backups without editHistory default to empty array.
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(UUID.self, forKey: .id)
+            startMs = try container.decode(Int64.self, forKey: .startMs)
+            endMs = try container.decode(Int64.self, forKey: .endMs)
+            text = try container.decode(String.self, forKey: .text)
+            isUserEdited = try container.decode(Bool.self, forKey: .isUserEdited)
+            originalText = try container.decodeIfPresent(String.self, forKey: .originalText)
+            createdAt = try container.decode(Date.self, forKey: .createdAt)
+            editHistory = try container.decodeIfPresent([EditHistoryBackup].self, forKey: .editHistory) ?? []
+        }
+
+        init(
+            id: UUID,
+            startMs: Int64,
+            endMs: Int64,
+            text: String,
+            isUserEdited: Bool,
+            originalText: String?,
+            createdAt: Date,
+            editHistory: [EditHistoryBackup]
+        ) {
+            self.id = id
+            self.startMs = startMs
+            self.endMs = endMs
+            self.text = text
+            self.isUserEdited = isUserEdited
+            self.originalText = originalText
+            self.createdAt = createdAt
+            self.editHistory = editHistory
+        }
+    }
+
+    struct EditHistoryBackup: Codable {
+        let id: UUID
+        let previousText: String
+        let newText: String
+        let editedAt: Date
+        let editIndex: Int16
     }
 
     struct HighlightBackup: Codable {

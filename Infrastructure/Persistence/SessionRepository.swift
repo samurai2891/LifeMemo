@@ -157,17 +157,27 @@ final class SessionRepository {
     // MARK: - Session Editing
 
     func updateSegmentText(segmentId: UUID, newText: String) {
-        let request = NSFetchRequest<TranscriptSegmentEntity>(entityName: "TranscriptSegmentEntity")
-        request.predicate = NSPredicate(format: "id == %@", segmentId as CVarArg)
-        request.fetchLimit = 1
+        let trimmed = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let segment = fetchSegment(id: segmentId) else { return }
 
-        guard let segment = try? context.fetch(request).first else { return }
+        let previousText = segment.text ?? ""
 
         // Save original text if this is the first edit
         if !segment.isUserEdited {
-            segment.originalText = segment.text
+            segment.originalText = previousText
         }
-        segment.text = newText
+
+        // Create edit history record
+        let existingCount = segment.editHistoryArray.count
+        let historyEntry = EditHistoryEntity(context: context)
+        historyEntry.id = UUID()
+        historyEntry.previousText = previousText
+        historyEntry.newText = trimmed
+        historyEntry.editedAt = Date()
+        historyEntry.editIndex = Int16(existingCount + 1)
+        historyEntry.segment = segment
+
+        segment.text = trimmed
         segment.isUserEdited = true
         saveOrLog()
     }
@@ -181,6 +191,61 @@ final class SessionRepository {
     func updateSessionBodyText(sessionId: UUID, bodyText: String?) {
         guard let session = fetchSession(id: sessionId) else { return }
         session.bodyText = bodyText
+        saveOrLog()
+    }
+
+    // MARK: - Edit History
+
+    /// Fetches all edit history entries for a segment, sorted by editIndex ascending.
+    func fetchEditHistory(segmentId: UUID) -> [EditHistoryEntry] {
+        guard let segment = fetchSegment(id: segmentId) else { return [] }
+        let segId = segment.id ?? segmentId
+        return segment.editHistoryArray.map { $0.toEntry(segmentId: segId) }
+    }
+
+    /// Reverts a segment's text to the state before a specific edit history entry.
+    /// Deletes all edit history records with editIndex greater than the reverted entry.
+    func revertSegment(segmentId: UUID, toHistoryEntryId: UUID) {
+        guard let segment = fetchSegment(id: segmentId) else { return }
+
+        let historyRequest = NSFetchRequest<EditHistoryEntity>(entityName: "EditHistoryEntity")
+        historyRequest.predicate = NSPredicate(format: "id == %@", toHistoryEntryId as CVarArg)
+        historyRequest.fetchLimit = 1
+
+        guard let targetEntry = try? context.fetch(historyRequest).first else { return }
+
+        segment.text = targetEntry.previousText
+
+        // If reverting to the very first edit, restore to unedited state
+        if targetEntry.editIndex == 1 {
+            segment.isUserEdited = false
+            segment.originalText = nil
+        }
+
+        // Delete the target entry and all entries with higher editIndex
+        let targetIndex = targetEntry.editIndex
+        let entriesToDelete = segment.editHistoryArray.filter { $0.editIndex >= targetIndex }
+        for entry in entriesToDelete {
+            context.delete(entry)
+        }
+
+        saveOrLog()
+    }
+
+    /// Reverts a segment to its original (pre-edit) text, deleting all edit history.
+    func revertSegmentToOriginal(segmentId: UUID) {
+        guard let segment = fetchSegment(id: segmentId) else { return }
+        guard let original = segment.originalText else { return }
+
+        segment.text = original
+        segment.isUserEdited = false
+        segment.originalText = nil
+
+        // Delete all edit history for this segment
+        for entry in segment.editHistoryArray {
+            context.delete(entry)
+        }
+
         saveOrLog()
     }
 
@@ -541,6 +606,16 @@ final class SessionRepository {
             segment.originalText = segmentBackup.originalText
             segment.createdAt = segmentBackup.createdAt
             segment.session = session
+
+            for historyBackup in segmentBackup.editHistory {
+                let historyEntry = EditHistoryEntity(context: context)
+                historyEntry.id = historyBackup.id
+                historyEntry.previousText = historyBackup.previousText
+                historyEntry.newText = historyBackup.newText
+                historyEntry.editedAt = historyBackup.editedAt
+                historyEntry.editIndex = historyBackup.editIndex
+                historyEntry.segment = segment
+            }
         }
 
         for highlightBackup in backup.highlights {
@@ -556,6 +631,19 @@ final class SessionRepository {
     }
 
     // MARK: - Private Helpers
+
+    private func fetchSegment(id: UUID) -> TranscriptSegmentEntity? {
+        let request = NSFetchRequest<TranscriptSegmentEntity>(entityName: "TranscriptSegmentEntity")
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+
+        do {
+            return try context.fetch(request).first
+        } catch {
+            print("Failed to fetch segment \(id): \(error.localizedDescription)")
+            return nil
+        }
+    }
 
     private func fetchChunk(id: UUID) -> ChunkEntity? {
         let request = NSFetchRequest<ChunkEntity>(entityName: "ChunkEntity")

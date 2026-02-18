@@ -41,6 +41,6 @@ final class BackupManifestTests: XCTestCase {
     }
 
     func testCurrentVersion() {
-        XCTAssertEqual(BackupManifest.currentVersion, 1)
+        XCTAssertEqual(BackupManifest.currentVersion, 2)
     }
 }

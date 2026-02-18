@@ -58,6 +58,10 @@ final class SessionDetailViewModel: ObservableObject {
     @Published var editingSegmentText: String = ""
     @Published private(set) var segments: [SegmentDisplayInfo] = []
 
+    // Edit History
+    @Published private(set) var selectedSegmentHistory: [EditHistoryEntry] = []
+    @Published var showingHistoryForSegmentId: UUID?
+
     // MARK: - Dependencies
 
     let sessionId: UUID
@@ -174,24 +178,47 @@ final class SessionDetailViewModel: ObservableObject {
         editingSegmentText = ""
 
         // Reload segments from entity
-        if let entity = repository.fetchSession(id: sessionId) {
-            segments = entity.segmentsArray.map { seg in
-                SegmentDisplayInfo(
-                    id: seg.id ?? UUID(),
-                    text: seg.text ?? "",
-                    startMs: seg.startMs,
-                    endMs: seg.endMs,
-                    isUserEdited: seg.isUserEdited,
-                    originalText: seg.originalText
-                )
-            }
-            transcript = repository.getFullTranscriptText(sessionId: sessionId)
+        reloadSegmentsFromEntity()
+
+        // If we're viewing history for the segment that was just edited, refresh it
+        if showingHistoryForSegmentId == segmentId {
+            selectedSegmentHistory = repository.fetchEditHistory(segmentId: segmentId)
         }
     }
 
     func cancelSegmentEdit() {
         editingSegmentId = nil
         editingSegmentText = ""
+    }
+
+    // MARK: - Edit History
+
+    func loadEditHistory(for segmentId: UUID) {
+        selectedSegmentHistory = repository.fetchEditHistory(segmentId: segmentId)
+        showingHistoryForSegmentId = segmentId
+    }
+
+    func dismissEditHistory() {
+        selectedSegmentHistory = []
+        showingHistoryForSegmentId = nil
+    }
+
+    func revertToVersion(historyEntryId: UUID) {
+        guard let segmentId = showingHistoryForSegmentId else { return }
+
+        repository.revertSegment(segmentId: segmentId, toHistoryEntryId: historyEntryId)
+        reloadSegmentsFromEntity()
+        dismissEditHistory()
+    }
+
+    func revertToOriginal(segmentId: UUID) {
+        repository.revertSegmentToOriginal(segmentId: segmentId)
+        reloadSegmentsFromEntity()
+        dismissEditHistory()
+    }
+
+    func editCount(for segmentId: UUID) -> Int {
+        repository.fetchEditHistory(segmentId: segmentId).count
     }
 
     // MARK: - Tag Management
@@ -317,6 +344,24 @@ final class SessionDetailViewModel: ObservableObject {
     func deleteSessionCompletely() {
         repository.deleteSessionCompletely(sessionId: sessionId)
         didDeleteSession = true
+    }
+
+    // MARK: - Private Helpers
+
+    private func reloadSegmentsFromEntity() {
+        if let entity = repository.fetchSession(id: sessionId) {
+            segments = entity.segmentsArray.map { seg in
+                SegmentDisplayInfo(
+                    id: seg.id ?? UUID(),
+                    text: seg.text ?? "",
+                    startMs: seg.startMs,
+                    endMs: seg.endMs,
+                    isUserEdited: seg.isUserEdited,
+                    originalText: seg.originalText
+                )
+            }
+            transcript = repository.getFullTranscriptText(sessionId: sessionId)
+        }
     }
 }
 
