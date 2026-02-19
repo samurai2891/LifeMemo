@@ -63,7 +63,7 @@ struct SessionDetailView: View {
         .sheet(isPresented: $viewModel.showPlayback) {
             NavigationStack {
                 if let controller = viewModel.playbackController {
-                    PlaybackView(controller: controller)
+                    PlaybackView(controller: controller, audioPlayer: controller.audioPlayer)
                         .navigationTitle("Playback")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {

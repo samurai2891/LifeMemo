@@ -96,6 +96,7 @@ final class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             if wasPlaying {
                 player?.play()
                 state = .playing
+                startUpdateTimer()
             }
         }
     }
@@ -190,11 +191,14 @@ final class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     private func startUpdateTimer() {
         stopUpdateTimer()
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.updateCurrentTime()
             }
         }
+        // Add to .common mode so the timer fires during UI tracking (drag gestures)
+        RunLoop.main.add(timer, forMode: .common)
+        updateTimer = timer
     }
 
     private func stopUpdateTimer() {

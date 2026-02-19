@@ -39,6 +39,7 @@ final class PlaybackViewModel: ObservableObject {
         // Build chunk info list
         let chunks: [AudioPlayer.ChunkInfo] = session.chunksArray.compactMap { chunk in
             guard !chunk.audioDeleted,
+                  chunk.durationSec > 0,
                   let relPath = chunk.relativePath,
                   let url = fileStore.resolveAbsoluteURL(relativePath: relPath) else { return nil }
 

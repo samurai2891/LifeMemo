@@ -8,6 +8,7 @@ import SwiftUI
 struct PlaybackView: View {
 
     @ObservedObject var controller: SyncedPlaybackController
+    @ObservedObject var audioPlayer: AudioPlayer
     @EnvironmentObject private var coordinator: RecordingCoordinator
 
     @State private var isDragging = false
@@ -57,8 +58,8 @@ struct PlaybackView: View {
             VStack(spacing: 4) {
                 // Progress bar
                 GeometryReader { geometry in
-                    let total = max(1, controller.audioPlayer.totalDurationMs)
-                    let current = isDragging ? dragTimeMs : controller.audioPlayer.currentTimeMs
+                    let total = max(1, audioPlayer.totalDurationMs)
+                    let current = isDragging ? dragTimeMs : audioPlayer.currentTimeMs
                     let progress = CGFloat(current) / CGFloat(total)
 
                     ZStack(alignment: .leading) {
@@ -78,7 +79,7 @@ struct PlaybackView: View {
                                 dragTimeMs = Int64(Double(total) * Double(max(0, min(1, ratio))))
                             }
                             .onEnded { _ in
-                                controller.audioPlayer.seekTo(ms: dragTimeMs)
+                                audioPlayer.seekTo(ms: dragTimeMs)
                                 isDragging = false
                             }
                     )
@@ -87,13 +88,13 @@ struct PlaybackView: View {
 
                 // Time labels
                 HStack {
-                    Text(formatMs(isDragging ? dragTimeMs : controller.audioPlayer.currentTimeMs))
+                    Text(formatMs(isDragging ? dragTimeMs : audioPlayer.currentTimeMs))
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
 
                     Spacer()
 
-                    Text(formatMs(controller.audioPlayer.totalDurationMs))
+                    Text(formatMs(audioPlayer.totalDurationMs))
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
@@ -105,11 +106,11 @@ struct PlaybackView: View {
                 Menu {
                     ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
                         Button("\(rate, specifier: "%.2g")x") {
-                            controller.audioPlayer.playbackRate = Float(rate)
+                            audioPlayer.playbackRate = Float(rate)
                         }
                     }
                 } label: {
-                    Text("\(controller.audioPlayer.playbackRate, specifier: "%.2g")x")
+                    Text("\(audioPlayer.playbackRate, specifier: "%.2g")x")
                         .font(.caption.bold())
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -119,7 +120,7 @@ struct PlaybackView: View {
 
                 // Skip backward
                 Button {
-                    controller.audioPlayer.skipBackward()
+                    audioPlayer.skipBackward()
                 } label: {
                     Image(systemName: "gobackward.15")
                         .font(.title2)
@@ -127,24 +128,24 @@ struct PlaybackView: View {
 
                 // Play/Pause
                 Button {
-                    switch controller.audioPlayer.state {
+                    switch audioPlayer.state {
                     case .playing:
-                        controller.audioPlayer.pause()
+                        audioPlayer.pause()
                     case .finished:
-                        controller.audioPlayer.seekTo(ms: 0)
-                        controller.audioPlayer.play()
+                        audioPlayer.seekTo(ms: 0)
+                        audioPlayer.play()
                     default:
-                        controller.audioPlayer.play()
+                        audioPlayer.play()
                     }
                 } label: {
-                    Image(systemName: controller.audioPlayer.state == .playing ? "pause.circle.fill" : "play.circle.fill")
+                    Image(systemName: audioPlayer.state == .playing ? "pause.circle.fill" : "play.circle.fill")
                         .font(.system(size: 44))
                         .foregroundStyle(Color.accentColor)
                 }
 
                 // Skip forward
                 Button {
-                    controller.audioPlayer.skipForward()
+                    audioPlayer.skipForward()
                 } label: {
                     Image(systemName: "goforward.15")
                         .font(.title2)
@@ -152,7 +153,7 @@ struct PlaybackView: View {
 
                 // Stop
                 Button {
-                    controller.audioPlayer.stop()
+                    audioPlayer.stop()
                 } label: {
                     Image(systemName: "stop.fill")
                         .font(.title3)
