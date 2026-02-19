@@ -2,7 +2,7 @@ import AVFAudio
 
 /// Configures AVAudioSession for background recording.
 ///
-/// Activates the session with `.record` category and `.measurement` mode,
+/// Activates the session with `.playAndRecord` category and `.measurement` mode,
 /// which provides high-fidelity mono input suitable for speech recognition.
 final class AudioSessionConfigurator {
 
@@ -16,7 +16,7 @@ final class AudioSessionConfigurator {
         try session.setCategory(
             .playAndRecord,
             mode: .measurement,
-            options: [.allowBluetooth, .defaultToSpeaker]
+            options: [.allowBluetooth, .defaultToSpeaker, .duckOthers]
         )
         try session.setActive(true)
     }
