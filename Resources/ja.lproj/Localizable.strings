@@ -353,6 +353,7 @@
 "Delete Sessions" = "セッションを削除";
 "Choose how to delete the selected sessions. Deleting audio only preserves transcripts." = "選択したセッションの削除方法を選んでください。音声のみ削除すると文字起こしが保持されます。";
 "Batch Operation Complete" = "一括操作完了";
+"Choose how to delete this session. Deleting audio only preserves the transcript." = "このセッションの削除方法を選んでください。音声のみ削除すると文字起こしが保持されます。";
 
 /* ===== Home - Additional ===== */
 "Loading sessions..." = "セッションを読み込み中...";

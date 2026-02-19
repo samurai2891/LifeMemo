@@ -16,6 +16,8 @@ final class HomeViewModel: ObservableObject {
     @Published var selectedSessionIds: Set<UUID> = []
     @Published var showBatchDeleteConfirm: Bool = false
     @Published var batchResultMessage: String? = nil
+    @Published var swipeDeleteTargetId: UUID? = nil
+    @Published var showSwipeDeleteConfirm: Bool = false
     @Published private(set) var sessions: [SessionSummary] = []
     @Published private(set) var filteredSessions: [SessionSummary] = []
     @Published private(set) var availableFolders: [FolderInfo] = []
@@ -55,6 +57,24 @@ final class HomeViewModel: ObservableObject {
         repository.deleteSessionCompletely(sessionId: sessionId)
         sessions = sessions.filter { $0.id != sessionId }
         applyFilter()
+    }
+
+    // MARK: - Single Session Swipe Delete
+
+    func requestSwipeDelete(sessionId: UUID) {
+        swipeDeleteTargetId = sessionId
+        showSwipeDeleteConfirm = true
+    }
+
+    func swipeDeleteCompletely() {
+        guard let targetId = swipeDeleteTargetId else { return }
+        swipeDeleteTargetId = nil
+        deleteSession(sessionId: targetId)
+    }
+
+    func swipeDeleteAudioOnly(sessionId: UUID) {
+        repository.deleteAudioKeepTranscript(sessionId: sessionId)
+        loadSessions()
     }
 
     // MARK: - Batch Selection

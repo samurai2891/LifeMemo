@@ -132,6 +132,20 @@ struct HomeView: View {
                 Button("Cancel", role: .cancel) {}
             }
             .confirmationDialog(
+                "Delete Session",
+                isPresented: $viewModel.showSwipeDeleteConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Everything", role: .destructive) {
+                    viewModel.swipeDeleteCompletely()
+                }
+                Button("Cancel", role: .cancel) {
+                    viewModel.swipeDeleteTargetId = nil
+                }
+            } message: {
+                Text("Choose how to delete this session. Deleting audio only preserves the transcript.")
+            }
+            .confirmationDialog(
                 "Delete Sessions",
                 isPresented: $viewModel.showBatchDeleteConfirm,
                 titleVisibility: .visible
@@ -201,9 +215,24 @@ struct HomeView: View {
                         } label: {
                             SessionRowView(session: session)
                         }
-                    }
-                    .onDelete { indexSet in
-                        deleteSession(at: indexSet)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            if !isInEditMode {
+                                Button(role: .destructive) {
+                                    viewModel.requestSwipeDelete(sessionId: session.id)
+                                } label: {
+                                    Label("Delete Session", systemImage: "trash")
+                                }
+
+                                if session.audioKept {
+                                    Button {
+                                        viewModel.swipeDeleteAudioOnly(sessionId: session.id)
+                                    } label: {
+                                        Label("Delete Audio Only", systemImage: "speaker.slash")
+                                    }
+                                    .tint(.orange)
+                                }
+                            }
+                        }
                     }
 
                     // Bottom spacer so FAB doesn't cover last row
@@ -334,13 +363,6 @@ struct HomeView: View {
     private func startRecording(language: LanguageMode) {
         coordinator.startAlwaysOn(languageMode: language)
         showRecordingView = true
-    }
-
-    private func deleteSession(at offsets: IndexSet) {
-        for index in offsets {
-            let session = viewModel.filteredSessions[index]
-            viewModel.deleteSession(sessionId: session.id)
-        }
     }
 
     private func enterEditMode() {

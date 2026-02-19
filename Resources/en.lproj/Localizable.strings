@@ -354,6 +354,7 @@
 "Delete Sessions" = "Delete Sessions";
 "Choose how to delete the selected sessions. Deleting audio only preserves transcripts." = "Choose how to delete the selected sessions. Deleting audio only preserves transcripts.";
 "Batch Operation Complete" = "Batch Operation Complete";
+"Choose how to delete this session. Deleting audio only preserves the transcript." = "Choose how to delete this session. Deleting audio only preserves the transcript.";
 
 /* ===== Home - Additional ===== */
 "Loading sessions..." = "Loading sessions...";

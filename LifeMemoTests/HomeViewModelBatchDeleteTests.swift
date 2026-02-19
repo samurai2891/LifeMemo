@@ -161,6 +161,73 @@ final class HomeViewModelBatchDeleteTests: XCTestCase {
         )
     }
 
+    // MARK: - Single Session Swipe Delete
+
+    func testRequestSwipeDeleteSetsTarget() {
+        let ids = createSessions(count: 2)
+        viewModel.loadSessions()
+
+        viewModel.requestSwipeDelete(sessionId: ids[0])
+
+        XCTAssertEqual(viewModel.swipeDeleteTargetId, ids[0])
+        XCTAssertTrue(viewModel.showSwipeDeleteConfirm)
+    }
+
+    func testSwipeDeleteCompletelyRemovesSession() {
+        let ids = createSessions(count: 3)
+        viewModel.loadSessions()
+        XCTAssertEqual(viewModel.filteredSessions.count, 3)
+
+        viewModel.requestSwipeDelete(sessionId: ids[1])
+        viewModel.swipeDeleteCompletely()
+
+        XCTAssertEqual(viewModel.filteredSessions.count, 2)
+        XCTAssertNil(viewModel.swipeDeleteTargetId)
+        XCTAssertFalse(
+            viewModel.filteredSessions.contains(where: { $0.id == ids[1] })
+        )
+    }
+
+    func testSwipeDeleteCompletelyClearsTargetWhenNil() {
+        _ = createSessions(count: 1)
+        viewModel.loadSessions()
+
+        viewModel.swipeDeleteCompletely()
+
+        XCTAssertEqual(
+            viewModel.filteredSessions.count, 1,
+            "No session should be deleted when targetId is nil"
+        )
+    }
+
+    func testSwipeDeleteAudioOnlyPreservesSession() {
+        let ids = createSessions(count: 2)
+        viewModel.loadSessions()
+
+        viewModel.swipeDeleteAudioOnly(sessionId: ids[0])
+
+        XCTAssertEqual(viewModel.filteredSessions.count, 2, "Session should still exist")
+        let session = repository.fetchSession(id: ids[0])
+        XCTAssertEqual(session?.audioKept, false, "Audio should be removed")
+        for chunk in session?.chunksArray ?? [] {
+            XCTAssertTrue(chunk.audioDeleted)
+            XCTAssertNil(chunk.relativePath)
+        }
+    }
+
+    func testSwipeDeleteDoesNotAffectBatchSelection() {
+        let ids = createSessions(count: 3)
+        viewModel.loadSessions()
+        viewModel.selectedSessionIds = Set(ids)
+
+        viewModel.swipeDeleteAudioOnly(sessionId: ids[0])
+
+        XCTAssertEqual(
+            viewModel.selectedSessionIds.count, 3,
+            "Swipe delete should not affect batch selection state"
+        )
+    }
+
     // MARK: - Private Helpers
 
     @discardableResult
