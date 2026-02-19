@@ -20,7 +20,8 @@ struct SessionDetailView: View {
                 qnaService: container.qna,
                 summarizer: container.summarizer,
                 exportService: container.exportService,
-                enhancedExportService: container.enhancedExportService
+                enhancedExportService: container.enhancedExportService,
+                transcriptionQueue: container.transcriptionQueue
             )
         )
     }
@@ -735,8 +736,22 @@ struct SessionDetailView: View {
 
     private var chunkStatusSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Chunks (\(viewModel.chunks.count))", systemImage: "square.stack.3d.up")
-                .font(.headline)
+            HStack {
+                Label("Chunks (\(viewModel.chunks.count))", systemImage: "square.stack.3d.up")
+                    .font(.headline)
+
+                Spacer()
+
+                if viewModel.hasRetryableChunks {
+                    Button {
+                        viewModel.retranscribeAllFailed()
+                    } label: {
+                        Label("Retry All", systemImage: "arrow.clockwise")
+                            .font(.caption.bold())
+                    }
+                    .disabled(viewModel.isRetranscribing)
+                }
+            }
 
             if viewModel.chunks.isEmpty {
                 Text("No chunks recorded.")
@@ -746,7 +761,14 @@ struct SessionDetailView: View {
             } else {
                 LazyVStack(spacing: 8) {
                     ForEach(viewModel.chunks) { chunk in
-                        ChunkStatusRow(chunk: chunk)
+                        ChunkStatusRow(
+                            chunk: chunk,
+                            isRetranscribing: viewModel.isRetranscribing,
+                            onRetry: (chunk.status == .failed || chunk.status == .pending)
+                                && !chunk.audioDeleted
+                                ? { viewModel.retranscribeChunk(chunkId: chunk.id) }
+                                : nil
+                        )
                     }
                 }
             }
@@ -863,6 +885,8 @@ private struct AnswerSegmentRow: View {
 private struct ChunkStatusRow: View {
 
     let chunk: ChunkDisplayInfo
+    let isRetranscribing: Bool
+    let onRetry: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -890,6 +914,17 @@ private struct ChunkStatusRow: View {
                 Image(systemName: "speaker.slash.fill")
                     .font(.caption2)
                     .foregroundStyle(.orange)
+            }
+
+            if let onRetry {
+                Button {
+                    onRetry()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                }
+                .disabled(isRetranscribing)
             }
         }
         .padding(.horizontal, 12)

@@ -59,6 +59,21 @@ actor TranscriptionQueueActor {
         pendingJobs.removeAll { $0.chunkId == chunkId }
     }
 
+    /// Re-enqueues a chunk for transcription after a retry from the session detail screen.
+    /// The caller is responsible for resetting the chunk via `SessionRepository.resetChunkForRetranscription`
+    /// before invoking this method.
+    ///
+    /// Note: `await` returns once the job has been enqueued and the queue has processed
+    /// as far as it can. If other jobs are already running, the new job may not be complete
+    /// when this method returns.
+    ///
+    /// - Parameters:
+    ///   - chunkId: The identifier of the audio chunk to retranscribe.
+    ///   - sessionId: The session the chunk belongs to.
+    func retranscribeChunk(chunkId: UUID, sessionId: UUID) async {
+        await enqueue(chunkId: chunkId, sessionId: sessionId)
+    }
+
     /// Sets whether recording is currently active.
     ///
     /// While recording is active, transcription processing is deferred to avoid

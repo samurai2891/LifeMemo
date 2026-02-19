@@ -35,6 +35,9 @@ final class SessionDetailViewModel: ObservableObject {
     @Published var showPlayback: Bool = false
     @Published private(set) var playbackController: SyncedPlaybackController?
 
+    // Retranscription
+    @Published private(set) var isRetranscribing: Bool = false
+
     // Errors
     @Published var errorMessage: String?
 
@@ -77,6 +80,7 @@ final class SessionDetailViewModel: ObservableObject {
     private let summarizer: SimpleSummarizer
     private let exportService: ExportService
     let enhancedExportService: EnhancedExportService
+    private let transcriptionQueue: TranscriptionQueueActor
     private var audioPlayer: AudioPlayer?
 
     // MARK: - Init
@@ -88,7 +92,8 @@ final class SessionDetailViewModel: ObservableObject {
         qnaService: SimpleQnAService,
         summarizer: SimpleSummarizer,
         exportService: ExportService,
-        enhancedExportService: EnhancedExportService
+        enhancedExportService: EnhancedExportService,
+        transcriptionQueue: TranscriptionQueueActor
     ) {
         self.sessionId = sessionId
         self.repository = repository
@@ -97,6 +102,7 @@ final class SessionDetailViewModel: ObservableObject {
         self.summarizer = summarizer
         self.exportService = exportService
         self.enhancedExportService = enhancedExportService
+        self.transcriptionQueue = transcriptionQueue
     }
 
     // MARK: - Data Loading
@@ -370,6 +376,55 @@ final class SessionDetailViewModel: ObservableObject {
     func deleteSessionCompletely() {
         repository.deleteSessionCompletely(sessionId: sessionId)
         didDeleteSession = true
+    }
+
+    // MARK: - Retranscription
+
+    /// Whether any chunks are eligible for retry (failed or pending with audio available).
+    var hasRetryableChunks: Bool {
+        chunks.contains { ($0.status == .failed || $0.status == .pending) && !$0.audioDeleted }
+    }
+
+    /// Retranscribes a single chunk by resetting its state and re-enqueuing it.
+    func retranscribeChunk(chunkId: UUID) {
+        guard !isRetranscribing else { return }
+        guard let chunkInfo = chunks.first(where: { $0.id == chunkId }),
+              !chunkInfo.audioDeleted else {
+            errorMessage = "Audio file has been deleted. Cannot retranscribe."
+            return
+        }
+
+        isRetranscribing = true
+        repository.resetChunkForRetranscription(chunkId: chunkId, sessionId: sessionId)
+        loadSession()
+
+        Task {
+            await transcriptionQueue.retranscribeChunk(chunkId: chunkId, sessionId: sessionId)
+            loadSession()
+            isRetranscribing = false
+        }
+    }
+
+    /// Retranscribes all failed and pending chunks that still have audio files.
+    func retranscribeAllFailed() {
+        guard !isRetranscribing else { return }
+        let retryTargets = chunks.filter { chunk in
+            (chunk.status == .failed || chunk.status == .pending) && !chunk.audioDeleted
+        }
+        guard !retryTargets.isEmpty else { return }
+
+        isRetranscribing = true
+        let chunkIds = retryTargets.map(\.id)
+        repository.resetChunksForRetranscription(chunkIds: chunkIds, sessionId: sessionId)
+        loadSession()
+
+        Task {
+            for chunk in retryTargets {
+                await transcriptionQueue.retranscribeChunk(chunkId: chunk.id, sessionId: sessionId)
+            }
+            loadSession()
+            isRetranscribing = false
+        }
     }
 
     // MARK: - Private Helpers

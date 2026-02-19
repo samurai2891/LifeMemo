@@ -200,6 +200,66 @@ final class SessionRepository {
         return session.languageMode.locale
     }
 
+    // MARK: - Retranscription
+
+    /// Deletes all transcript segments (and their edit history) for a given chunk.
+    /// Used to clean up old results before retranscription.
+    func deleteSegmentsForChunk(chunkId: UUID) {
+        guard let chunk = fetchChunk(id: chunkId) else { return }
+        if let segments = chunk.segments as? Set<TranscriptSegmentEntity> {
+            for segment in segments {
+                context.delete(segment)
+            }
+        }
+        saveOrLog()
+    }
+
+    /// Resets a single chunk for retranscription: deletes existing segments, sets chunk
+    /// status to `.pending`, and transitions the session back to `.processing`.
+    /// Saves once at the end for efficiency.
+    func resetChunkForRetranscription(chunkId: UUID, sessionId: UUID) {
+        // Delete segments (without intermediate save)
+        if let chunk = fetchChunk(id: chunkId),
+           let segments = chunk.segments as? Set<TranscriptSegmentEntity> {
+            for segment in segments {
+                context.delete(segment)
+            }
+        }
+
+        // Reset chunk status
+        if let chunk = fetchChunk(id: chunkId) {
+            chunk.transcriptionStatus = .pending
+        }
+
+        // Transition session to processing
+        if let session = fetchSession(id: sessionId),
+           session.status == .ready || session.status == .error {
+            session.status = .processing
+        }
+
+        saveOrLog()
+    }
+
+    /// Resets multiple chunks for retranscription in a single batch save.
+    func resetChunksForRetranscription(chunkIds: [UUID], sessionId: UUID) {
+        for chunkId in chunkIds {
+            if let chunk = fetchChunk(id: chunkId),
+               let segments = chunk.segments as? Set<TranscriptSegmentEntity> {
+                for segment in segments {
+                    context.delete(segment)
+                }
+                chunk.transcriptionStatus = .pending
+            }
+        }
+
+        if let session = fetchSession(id: sessionId),
+           session.status == .ready || session.status == .error {
+            session.status = .processing
+        }
+
+        saveOrLog()
+    }
+
     // MARK: - Session Finalization
 
     /// Checks if all chunks in a session have completed transcription (done or failed).
