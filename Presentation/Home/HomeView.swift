@@ -15,6 +15,7 @@ struct HomeView: View {
     @State private var showRecordingView = false
     @State private var selectedLanguage: LanguageMode = .auto
     @State private var showLanguagePicker = false
+    @State private var isInEditMode = false
 
     // MARK: - Init
 
@@ -34,33 +35,81 @@ struct HomeView: View {
             ZStack {
                 sessionList
 
-                VStack {
-                    Spacer()
-                    startRecordingButton
-                        .padding(.bottom, 24)
-                        .padding(.horizontal, 24)
+                if !isInEditMode {
+                    VStack {
+                        Spacer()
+                        startRecordingButton
+                            .padding(.bottom, 24)
+                            .padding(.horizontal, 24)
+                    }
                 }
             }
             .navigationTitle("LifeMemo")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    NavigationLink {
-                        AdvancedSearchView()
-                            .environmentObject(container)
-                            .environmentObject(coordinator)
-                    } label: {
-                        Image(systemName: "magnifyingglass")
+                if isInEditMode {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(viewModel.allFilteredSelected
+                               ? "Deselect All"
+                               : "Select All") {
+                            viewModel.toggleSelectAll()
+                        }
                     }
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        SettingsView(container: container)
-                    } label: {
-                        Image(systemName: "gear")
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            exitEditMode()
+                        }
+                    }
+                    ToolbarItem(placement: .bottomBar) {
+                        Button(role: .destructive) {
+                            viewModel.requestBatchDelete()
+                        } label: {
+                            Label(
+                                String(
+                                    format: NSLocalizedString(
+                                        "Delete Selected (%lld)",
+                                        comment: ""
+                                    ),
+                                    viewModel.selectedCount
+                                ),
+                                systemImage: "trash"
+                            )
+                        }
+                        .disabled(viewModel.selectedSessionIds.isEmpty)
+                    }
+                } else {
+                    ToolbarItem(placement: .topBarLeading) {
+                        NavigationLink {
+                            AdvancedSearchView()
+                                .environmentObject(container)
+                                .environmentObject(coordinator)
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        HStack(spacing: 16) {
+                            if !viewModel.filteredSessions.isEmpty {
+                                Button {
+                                    enterEditMode()
+                                } label: {
+                                    Image(systemName: "checklist")
+                                }
+                            }
+                            NavigationLink {
+                                SettingsView(container: container)
+                            } label: {
+                                Image(systemName: "gear")
+                            }
+                        }
                     }
                 }
             }
+            .environment(
+                \.editMode,
+                isInEditMode
+                    ? .constant(.active)
+                    : .constant(.inactive)
+            )
             .searchable(
                 text: $viewModel.searchQuery,
                 prompt: "Search sessions..."
@@ -81,6 +130,38 @@ struct HomeView: View {
                     }
                 }
                 Button("Cancel", role: .cancel) {}
+            }
+            .confirmationDialog(
+                "Delete Sessions",
+                isPresented: $viewModel.showBatchDeleteConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Session", role: .destructive) {
+                    viewModel.batchDeleteCompletely()
+                    exitEditMode()
+                }
+                Button("Delete Audio Only", role: .destructive) {
+                    viewModel.batchDeleteAudioOnly()
+                    exitEditMode()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Choose how to delete the selected sessions. Deleting audio only preserves transcripts.")
+            }
+            .alert(
+                "Batch Operation Complete",
+                isPresented: Binding(
+                    get: { viewModel.batchResultMessage != nil },
+                    set: { if !$0 { viewModel.batchResultMessage = nil } }
+                )
+            ) {
+                Button("OK") {
+                    viewModel.batchResultMessage = nil
+                }
+            } message: {
+                if let message = viewModel.batchResultMessage {
+                    Text(message)
+                }
             }
         }
         .onAppear {
@@ -104,7 +185,7 @@ struct HomeView: View {
                     emptyState
                 }
             } else {
-                List {
+                List(selection: $viewModel.selectedSessionIds) {
                     if !viewModel.availableFolders.isEmpty {
                         folderFilterBar
                             .listRowInsets(EdgeInsets())
@@ -260,6 +341,16 @@ struct HomeView: View {
             let session = viewModel.filteredSessions[index]
             viewModel.deleteSession(sessionId: session.id)
         }
+    }
+
+    private func enterEditMode() {
+        viewModel.deselectAll()
+        isInEditMode = true
+    }
+
+    private func exitEditMode() {
+        isInEditMode = false
+        viewModel.deselectAll()
     }
 
     private func loadLanguagePreference() {

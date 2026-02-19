@@ -1,0 +1,453 @@
+/* Localizable.strings (Japanese) - LifeMemo */
+
+/* ===== Common ===== */
+"OK" = "OK";
+"Cancel" = "キャンセル";
+"Delete" = "削除";
+"Done" = "完了";
+"Error" = "エラー";
+"Share" = "共有";
+"Back" = "戻る";
+"Continue" = "次へ";
+
+/* ===== Home ===== */
+"LifeMemo" = "LifeMemo";
+"Search sessions..." = "セッションを検索...";
+"No Sessions Yet" = "セッションがありません";
+"Start your first recording session to capture and transcribe audio." = "最初の録音セッションを開始して、音声をキャプチャ・文字起こししましょう。";
+"View Recording" = "録音を表示";
+"Start Recording" = "録音を開始";
+"Select Language" = "言語を選択";
+"Idle" = "待機中";
+"Recording" = "録音中";
+"Processing" = "処理中";
+"Ready" = "完了";
+"Audio removed" = "音声削除済み";
+"Summary" = "要約";
+"Untitled" = "無題";
+
+/* ===== Recording ===== */
+"LIVE" = "LIVE";
+"REC" = "REC";
+"chunks" = "チャンク";
+"Highlight" = "ハイライト";
+"Stop" = "停止";
+"Pause" = "一時停止";
+"Resume" = "再開";
+"Live Transcription" = "リアルタイム文字起こし";
+"Listening..." = "聞き取り中...";
+"Transcription paused" = "文字起こし一時停止中";
+
+/* ===== Playback ===== */
+"Session not found" = "セッションが見つかりません";
+"Audio has been deleted for this session" = "このセッションの音声は削除されています";
+"No playable audio chunks found" = "再生可能な音声チャンクが見つかりません";
+"Speaker %lld" = "スピーカー%lld";
+
+/* ===== Settings ===== */
+"Settings" = "設定";
+"Language" = "言語";
+"Recognition Mode" = "認識モード";
+"Transcription" = "文字起こし";
+"Select the language for speech recognition. Server Allowed mode improves accuracy for mixed languages but audio may be sent to Apple." = "音声認識の言語を選択してください。サーバー許可モードは多言語混在時の精度を向上させますが、音声がAppleに送信される場合があります。";
+"Permissions" = "権限";
+"Microphone" = "マイク";
+"Speech Recognition" = "音声認識";
+"Granted" = "許可済み";
+"Denied" = "拒否済み";
+"Not Requested" = "未リクエスト";
+"Open System Settings" = "システム設定を開く";
+"Both permissions are required for recording and transcription." = "録音と文字起こしには両方の権限が必要です。";
+"Audio Quality" = "音声品質";
+"Recording Quality" = "録音品質";
+"Summarization" = "要約";
+"Default Algorithm" = "デフォルトアルゴリズム";
+"Auto-Summarize" = "自動要約";
+"Run Benchmark" = "ベンチマークを実行";
+"On-device extractive summarization using Apple NaturalLanguage. No data leaves your device. Auto-Summarize generates a summary when transcription completes." = "Apple NaturalLanguageを使用したデバイス上での抽出型要約。データがデバイスから送信されることはありません。自動要約は文字起こし完了時に要約を生成します。";
+"Data" = "データ";
+"Storage" = "ストレージ";
+"Location" = "位置情報";
+"Capture Location" = "位置情報を記録";
+"Accuracy" = "精度";
+"Capture Timing" = "記録タイミング";
+"Place Name Lookup" = "場所名の検索";
+"Location data stays on your device. Place Name Lookup uses a brief network request to convert coordinates to a readable name." = "位置情報データはデバイス内に保存されます。場所名の検索は座標を読みやすい名前に変換するために短いネットワーク通信を行います。";
+"When enabled, the approximate location will be saved when starting a recording. Location data stays on your device." = "有効にすると、録音開始時におおよその位置情報が保存されます。位置情報データはデバイス内に保存されます。";
+"Privacy" = "プライバシー";
+"On-Device Processing" = "デバイス内処理";
+"All audio recording and speech recognition happens locally on your device. No data is sent to any server." = "音声録音と音声認識はすべてデバイス上でローカルに行われます。データはサーバーに送信されません。";
+"Audio is recorded locally. Speech recognition may use Apple's servers for improved accuracy when Server Allowed mode is enabled." = "音声はローカルに録音されます。サーバー許可モードが有効な場合、精度向上のためAppleのサーバーが使用されることがあります。";
+"Data Control" = "データ管理";
+"You can delete audio files while keeping transcripts, or delete entire sessions at any time." = "文字起こしを残して音声ファイルだけを削除したり、セッション全体をいつでも削除できます。";
+"Support" = "サポート";
+"Export Logs" = "ログをエクスポート";
+"Export diagnostic logs for troubleshooting. No personal data is included." = "トラブルシューティング用の診断ログをエクスポートします。個人データは含まれません。";
+"About" = "このアプリについて";
+"Version" = "バージョン";
+"Build" = "ビルド";
+"LifeMemo - Always-on voice recorder with on-device transcription." = "LifeMemo - 常時録音対応のデバイス上文字起こしボイスレコーダー。";
+
+/* ===== Settings - Benchmark ===== */
+"Summarization Benchmark" = "要約ベンチマーク";
+"Start Benchmark" = "ベンチマークを開始";
+
+/* ===== Session Detail ===== */
+"Untitled Session" = "無題のセッション";
+"Transcript" = "文字起こし";
+"No transcript yet" = "文字起こしはまだありません";
+"Details" = "詳細";
+"Started" = "開始";
+"Ended" = "終了";
+"Duration" = "時間";
+"Chunks" = "チャンク";
+"Audio" = "音声";
+"Kept" = "保持中";
+"Deleted" = "削除済み";
+"Tags" = "タグ";
+"Folder" = "フォルダ";
+"None" = "なし";
+"Add to Folder" = "フォルダに追加";
+"Highlights" = "ハイライト";
+"No highlights" = "ハイライトなし";
+"Edit Session" = "セッションを編集";
+"Title" = "タイトル";
+"Session Title" = "セッションタイトル";
+"Notes" = "メモ";
+"Add notes..." = "メモを追加...";
+"Save" = "保存";
+"Delete Session" = "セッションを削除";
+"Delete Audio Only" = "音声のみ削除";
+"This will permanently delete this session and all its data. This cannot be undone." = "このセッションとすべてのデータが完全に削除されます。この操作は取り消せません。";
+"Audio files will be deleted but transcripts will be preserved." = "音声ファイルは削除されますが、文字起こしは保持されます。";
+"Summarize" = "要約する";
+"Export" = "エクスポート";
+"Playback" = "再生";
+"Manage Speakers" = "スピーカーを管理";
+
+/* ===== Speaker Management ===== */
+"Speaker Management" = "スピーカー管理";
+"Rename speakers to identify participants in the conversation." = "会話の参加者を識別するためにスピーカー名を変更してください。";
+
+/* ===== Edit History ===== */
+"Edit History" = "編集履歴";
+"No edit history" = "編集履歴なし";
+"Original" = "オリジナル";
+
+/* ===== Search ===== */
+"Search" = "検索";
+"Search transcripts..." = "文字起こしを検索...";
+"Filters" = "フィルター";
+"Date Range" = "日付範囲";
+"From" = "開始日";
+"To" = "終了日";
+"Highlights Only" = "ハイライトのみ";
+"Has Audio" = "音声あり";
+"Sort By" = "並び替え";
+"Clear Filters" = "フィルターをクリア";
+"No results found" = "結果が見つかりません";
+"Advanced Search" = "詳細検索";
+
+/* ===== Tags ===== */
+"Existing Tags" = "既存のタグ";
+"No tags yet. Create one below." = "タグがまだありません。下から作成してください。";
+"Create New Tag" = "新しいタグを作成";
+"Tag name" = "タグ名";
+
+/* ===== Folder Picker ===== */
+"Move to Folder" = "フォルダに移動";
+"No Folder" = "フォルダなし";
+"New Folder" = "新規フォルダ";
+"Folder name" = "フォルダ名";
+"Create" = "作成";
+
+/* ===== Backup ===== */
+"Create Backup" = "バックアップを作成";
+"Backup Created" = "バックアップ完了";
+"Your encrypted backup has been created successfully." = "暗号化バックアップが正常に作成されました。";
+"Backup Failed" = "バックアップ失敗";
+"Deselect All" = "すべて解除";
+"Select All" = "すべて選択";
+"Include Audio Files" = "音声ファイルを含める";
+"Options" = "オプション";
+"Audio files significantly increase backup size. Transcripts are always included." = "音声ファイルを含めるとバックアップのサイズが大幅に増加します。文字起こしは常に含まれます。";
+"Password" = "パスワード";
+"Confirm Password" = "パスワードの確認";
+"Encryption Password" = "暗号化パスワード";
+"You will need this password to restore the backup. It cannot be recovered." = "このパスワードはバックアップの復元に必要です。パスワードの再発行はできません。";
+"Create Encrypted Backup" = "暗号化バックアップを作成";
+
+/* ===== Restore ===== */
+"Restore Backup" = "バックアップを復元";
+"Restore Complete" = "復元完了";
+"Your backup has been restored successfully." = "バックアップが正常に復元されました。";
+"Restore Failed" = "復元失敗";
+"Select Backup File" = "バックアップファイルを選択";
+"Backup File" = "バックアップファイル";
+"Select a .lifememobackup file to restore." = ".lifememobackupファイルを選択して復元してください。";
+"Backup Password" = "バックアップパスワード";
+"Enter the password used when creating the backup." = "バックアップ作成時に設定したパスワードを入力してください。";
+"Restore" = "復元";
+"Existing sessions with the same ID will be skipped. Your current data will not be affected." = "同じIDのセッションはスキップされます。現在のデータには影響しません。";
+"Could not access the selected file." = "選択したファイルにアクセスできませんでした。";
+
+/* ===== Export ===== */
+"Export Options" = "エクスポートオプション";
+"Export Error" = "エクスポートエラー";
+"Format" = "フォーマット";
+"Markdown" = "Markdown";
+"Text" = "テキスト";
+"PDF" = "PDF";
+"JSON" = "JSON";
+"Rich formatting with headers and lists. Compatible with note-taking apps." = "見出しやリストを含むリッチフォーマット。メモアプリと互換性があります。";
+"Plain text format. Compatible with all text editors." = "プレーンテキスト形式。すべてのテキストエディタと互換性があります。";
+"Formatted document with typography. Ready to print or share." = "タイポグラフィ付きの整形ドキュメント。印刷や共有に最適です。";
+"Structured data format. Ideal for programmatic access and data portability." = "構造化データ形式。プログラムによるアクセスやデータの移行に最適です。";
+"Session Metadata" = "セッション情報";
+"Keywords" = "キーワード";
+"Full Transcript" = "全文文字起こし";
+"Timestamps" = "タイムスタンプ";
+"Content" = "コンテンツ";
+"Select which sections to include in the exported file." = "エクスポートファイルに含めるセクションを選択してください。";
+"Exporting..." = "エクスポート中...";
+
+/* ===== Onboarding ===== */
+"Welcome to LifeMemo" = "LifeMemoへようこそ";
+"Your always-on voice recorder with on-device transcription. Capture every important moment, hands-free." = "常時録音対応のオンデバイス文字起こしレコーダー。ハンズフリーで大切な瞬間を逃しません。";
+"Your Privacy Matters" = "プライバシーを最優先に";
+"On-Device Only" = "デバイス内処理のみ";
+"All audio and transcription stays on your device. Nothing is uploaded to any server." = "音声と文字起こしはすべてデバイス内に保存されます。サーバーへのアップロードは一切ありません。";
+"Always-On Recording" = "常時録音";
+"LifeMemo records continuously while active. A visible indicator is always shown." = "LifeMemoはアクティブな間、継続的に録音します。録音中は常にインジケーターが表示されます。";
+"You Control Your Data" = "データはあなたの管理下に";
+"Delete audio files at any time while keeping transcripts, or delete everything." = "文字起こしを残して音声ファイルだけを削除したり、すべてを削除することができます。";
+"Always-On Consent" = "常時録音への同意";
+"LifeMemo continuously records audio while a session is active. This is essential for capturing everything without manual intervention." = "LifeMemoはセッション中、音声を継続的に録音します。手動操作なしですべてを記録するために不可欠な機能です。";
+"I understand and consent" = "理解し、同意します";
+"I agree that LifeMemo will record audio continuously during active sessions." = "アクティブなセッション中にLifeMemoが音声を継続的に録音することに同意します。";
+"Permissions Required" = "権限が必要です";
+"LifeMemo needs access to your microphone and speech recognition to record and transcribe audio." = "音声の録音と文字起こしのため、マイクと音声認識へのアクセスが必要です。";
+"Permissions Granted" = "権限が許可されました";
+"Grant Permissions" = "権限を許可する";
+"Open Settings" = "設定を開く";
+"Not Set" = "未設定";
+"Protect Your Data" = "データを保護する";
+"Enable App Lock to require authentication (Face ID, Touch ID, or passcode) when opening LifeMemo." = "LifeMemoを開く際にFace ID、Touch ID、またはパスコードによる認証を要求するアプリロックを有効にできます。";
+"You can change this later in Settings." = "この設定はあとから設定画面で変更できます。";
+"You're All Set!" = "準備完了！";
+"Start your first recording session and let LifeMemo capture everything for you." = "最初の録音セッションを開始して、LifeMemoにすべてを記録させましょう。";
+"Get Started" = "はじめる";
+
+/* ===== Storage ===== */
+"Calculating..." = "計算中...";
+"Total" = "合計";
+"Storage Usage" = "ストレージ使用状況";
+"Audio Files" = "音声ファイル";
+"Database" = "データベース";
+"Exports" = "エクスポート";
+"Search Index" = "検索インデックス";
+"Breakdown" = "内訳";
+"Free Space" = "空き容量";
+"Device" = "デバイス";
+"No sessions recorded yet" = "まだセッションが録音されていません";
+"Sessions by Audio Size" = "音声サイズ別セッション";
+"Sorted by audio file size, largest first." = "音声ファイルサイズの大きい順に表示しています。";
+"No audio" = "音声なし";
+"Delete Audio Older Than %@" = "%@以上前の音声を削除";
+"Delete All Exports" = "すべてのエクスポートを削除";
+"Cleanup" = "クリーンアップ";
+"Deleting audio keeps transcripts intact. This cannot be undone." = "音声を削除しても文字起こしは保持されます。この操作は取り消せません。";
+"No backups yet" = "バックアップはまだありません";
+"Backups" = "バックアップ";
+"Auto-Delete Old Audio" = "古い音声を自動削除";
+"Current Usage" = "現在の使用量";
+"Storage Limit" = "ストレージ上限";
+"When auto-delete is enabled, the oldest audio files will be removed when storage exceeds the limit." = "自動削除を有効にすると、ストレージが上限を超えた場合に最も古い音声ファイルから削除されます。";
+"Backup & Restore" = "バックアップと復元";
+"Delete Audio" = "音声を削除";
+"Delete Backup" = "バックアップを削除";
+"Cleanup Complete" = "クリーンアップ完了";
+"No data" = "データなし";
+"7 days" = "7日";
+"30 days" = "30日";
+"90 days" = "90日";
+"180 days" = "180日";
+
+/* ===== Storage Cleanup Guide ===== */
+"Cleanup Guide" = "クリーンアップガイド";
+"Delete Old Audio" = "古い音声を削除";
+"Delete Audio Older Than 30 Days" = "30日以上前の音声を削除";
+"Delete Audio Older Than 7 Days" = "7日以上前の音声を削除";
+"Usage" = "使用量";
+"Storage limit exceeded. Consider cleaning up old recordings." = "ストレージの上限を超えています。古い録音のクリーンアップを検討してください。";
+"Approaching storage limit." = "ストレージの上限に近づいています。";
+"Remove old audio files" = "古い音声ファイルを削除";
+"Transcripts will be preserved" = "文字起こしは保持されます";
+"Delete exported files" = "エクスポートファイルを削除";
+"Re-export anytime from sessions" = "セッションからいつでも再エクスポートできます";
+"Recommendations" = "おすすめ";
+"Clean Up Old Audio" = "古い音声をクリーンアップ";
+"Actions" = "操作";
+"Deleting audio preserves all transcripts and session data." = "音声を削除しても、文字起こしとセッションデータはすべて保持されます。";
+
+/* ===== Security ===== */
+"App Lock" = "アプリロック";
+"Security" = "セキュリティ";
+"When enabled, LifeMemo will require authentication each time you return to the app." = "有効にすると、アプリに戻るたびにLifeMemoが認証を要求します。";
+"Authentication Required" = "認証が必要です";
+"Could not verify your identity. App Lock was not enabled." = "本人確認ができませんでした。アプリロックは有効になりませんでした。";
+"Locked" = "ロック中";
+"Authentication failed. Please try again." = "認証に失敗しました。もう一度お試しください。";
+"Unlock" = "ロック解除";
+"Passcode" = "パスコード";
+
+/* ===== Domain Models - LanguageMode ===== */
+"Auto" = "自動";
+"Japanese" = "日本語";
+"English" = "英語";
+
+/* ===== Domain Models - RecognitionMode ===== */
+"On-Device (Privacy)" = "オンデバイス（プライバシー重視）";
+"Server Allowed (Quality)" = "サーバー許可（品質重視）";
+"Audio never leaves the device. Best for privacy." = "音声はデバイスから送信されません。プライバシーを最優先にします。";
+"Better accuracy for mixed languages. Audio may be sent to Apple." = "多言語混在時の精度が向上します。音声がAppleに送信される場合があります。";
+
+/* ===== Domain Models - AudioConfiguration.QualityProfile ===== */
+"Battery Saver" = "バッテリーセーバー";
+"Standard" = "標準";
+"High Quality" = "高品質";
+"Lower quality, significantly less battery usage" = "低品質、バッテリー消費を大幅に削減";
+"Good quality voice recording, balanced battery" = "高品質な音声録音、バランスの取れたバッテリー消費";
+"Best quality, higher battery usage" = "最高品質、バッテリー消費が多い";
+
+/* ===== Domain Models - SummarizationAlgorithm ===== */
+"TF-IDF" = "TF-IDF";
+"TextRank" = "TextRank";
+"Lead-Based" = "リードベース";
+"Term Frequency-Inverse Document Frequency scoring with position, length, and entity density signals." = "位置、長さ、エンティティ密度を考慮した単語頻度-逆文書頻度スコアリング。";
+"Graph-based ranking using sentence similarity, inspired by Google's PageRank algorithm." = "GoogleのPageRankアルゴリズムに着想を得た、文の類似度を使用したグラフベースのランキング。";
+"Prioritizes sentences by position, weighting early sentences as most important." = "文の位置を優先し、先頭の文を最も重要として重み付けします。";
+
+/* ===== Domain Models - LocationPreference ===== */
+"Approximate (~3km)" = "おおよそ（〜3km）";
+"Balanced (~100m)" = "バランス（〜100m）";
+"Precise (~10m)" = "高精度（〜10m）";
+"Recording Start" = "録音開始時";
+"Recording Stop" = "録音停止時";
+"Start & Stop" = "開始時と停止時";
+
+/* ===== Domain Models - SearchFilter.SortOrder ===== */
+"Newest First" = "新しい順";
+"Oldest First" = "古い順";
+"Most Relevant" = "関連度順";
+
+/* ===== TranscriptionCapabilityChecker ===== */
+"On-device transcription is available." = "オンデバイスの文字起こしが利用可能です。";
+"Speech recognition is not supported for this language on this device." = "このデバイスではこの言語の音声認識はサポートされていません。";
+"Speech recognizer is not available. Please check your device settings." = "音声認識が利用できません。デバイスの設定を確認してください。";
+"On-device speech model is not downloaded. Go to Settings > General > Keyboard > Dictation to download the language model." = "オンデバイスの音声モデルがダウンロードされていません。設定 > 一般 > キーボード > 音声入力から言語モデルをダウンロードしてください。";
+
+/* ===== Home - Batch Delete ===== */
+"Delete Selected (%lld)" = "選択した項目を削除 (%lld)";
+"Delete %lld Session(s)" = "%lld件のセッションを削除";
+"Delete Sessions" = "セッションを削除";
+"Choose how to delete the selected sessions. Deleting audio only preserves transcripts." = "選択したセッションの削除方法を選んでください。音声のみ削除すると文字起こしが保持されます。";
+"Batch Operation Complete" = "一括操作完了";
+
+/* ===== Home - Additional ===== */
+"Loading sessions..." = "セッションを読み込み中...";
+"All" = "すべて";
+
+/* ===== Session Detail - Additional ===== */
+"Session Detail" = "セッション詳細";
+"Rebuild" = "再生成";
+"Generate" = "生成";
+"Play Audio" = "音声を再生";
+"Export TXT" = "TXTをエクスポート";
+"Remove Audio" = "音声を削除";
+"No Audio" = "音声なし";
+"Loading session..." = "セッションを読み込み中...";
+"No summary available. Tap Generate to create one." = "要約がありません。「生成」をタップして作成してください。";
+"No notes yet. Tap Edit to add some." = "メモがありません。「編集」をタップして追加してください。";
+"No relevant segments found for this question." = "この質問に関連するセグメントが見つかりませんでした。";
+"No transcript available yet." = "文字起こしはまだありません。";
+"No chunks recorded." = "録音チャンクがありません。";
+"Searching..." = "検索中...";
+"Show original" = "オリジナルを表示";
+
+/* ===== Edit History - Additional ===== */
+"No edit history available for this segment." = "このセグメントの編集履歴はありません。";
+"Original Text" = "元のテキスト";
+"Current Text" = "現在のテキスト";
+"Current" = "現在";
+
+/* ===== Search - Additional ===== */
+"Try different keywords or adjust your filters" = "別のキーワードを試すか、フィルターを調整してください";
+"Tag:" = "タグ:";
+"Folder:" = "フォルダ:";
+"From:" = "開始:";
+"To:" = "終了:";
+"Any" = "すべて";
+
+/* ===== Folder Picker - Additional ===== */
+"Select Folder" = "フォルダを選択";
+
+/* ===== Storage - Additional ===== */
+"Backups contain the database only, not audio files." = "バックアップにはデータベースのみが含まれ、音声ファイルは含まれません。";
+"This will permanently delete all exported files. This cannot be undone." = "すべてのエクスポートファイルが完全に削除されます。この操作は取り消せません。";
+
+/* ===== Security - Additional ===== */
+"Require %@ to open LifeMemo" = "LifeMemoを開くときに%@を要求する";
+
+/* ===== Storage - Dynamic Messages ===== */
+"Deleted audio for %lld session(s)." = "%lld件のセッションの音声を削除しました。";
+"No sessions found older than %@ with audio." = "%@以上前の音声付きセッションは見つかりませんでした。";
+"Removed audio from %lld session(s). Transcripts preserved." = "%lld件のセッションの音声を削除しました。文字起こしは保持されています。";
+"No old audio files found to clean up." = "クリーンアップ対象の古い音声ファイルは見つかりませんでした。";
+"Backup saved as \"%@\"." = "バックアップを「%@」として保存しました。";
+"This will permanently delete the backup \"%@\". This cannot be undone." = "バックアップ「%@」が完全に削除されます。この操作は取り消せません。";
+"This will permanently delete audio files for sessions older than %@. Transcripts will be preserved. This cannot be undone." = "%@以上前のセッションの音声ファイルが完全に削除されます。文字起こしは保持されます。この操作は取り消せません。";
+"and %lld more sessions..." = "他%lld件のセッション...";
+"Older Than" = "経過日数";
+
+/* ===== Session Detail - More ===== */
+"Session Not Found" = "セッションが見つかりません";
+"This session may have been deleted." = "このセッションは削除された可能性があります。";
+"Audio is not available for playback." = "再生可能な音声がありません。";
+"Delete Audio, Keep Transcript" = "音声を削除し、文字起こしを保持";
+"Audio files will be permanently deleted. Transcripts will be preserved." = "音声ファイルは完全に削除されます。文字起こしは保持されます。";
+"Delete Everything" = "すべてを削除";
+"This will permanently delete the session, audio, and all transcripts." = "セッション、音声、すべての文字起こしが完全に削除されます。";
+"Audio Removed" = "音声削除済み";
+"No tags assigned." = "タグが割り当てられていません。";
+"Algorithm" = "アルゴリズム";
+"Edit" = "編集";
+"Ask a Question" = "質問する";
+"Ask about this session..." = "このセッションについて質問...";
+"Clear" = "クリア";
+"Speakers" = "スピーカー";
+"edited" = "編集済み";
+"Retry All" = "すべて再試行";
+
+/* ===== Session Detail ViewModel ===== */
+"Session not found." = "セッションが見つかりませんでした。";
+"Audio file has been deleted. Cannot retranscribe." = "音声ファイルは削除されています。再文字起こしできません。";
+"Pending" = "保留中";
+"Transcribing" = "文字起こし中";
+"Failed" = "失敗";
+
+/* ===== Edit History - More ===== */
+"No Edit History" = "編集履歴なし";
+"Revert to original" = "オリジナルに戻す";
+"Edits" = "編集";
+"Revert to this version" = "このバージョンに戻す";
+
+/* ===== Search - More ===== */
+"Load More" = "さらに読み込む";
+"Clear Dates" = "日付をクリア";
+"Tags & Folders" = "タグとフォルダ";
+"Tag" = "タグ";
+"Sort" = "並べ替え";
+"Sort Order" = "並び順";
+"Search Filters" = "検索フィルター";
+"Apply" = "適用";

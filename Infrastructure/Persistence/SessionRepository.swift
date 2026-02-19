@@ -522,6 +522,42 @@ final class SessionRepository {
         saveOrLog()
     }
 
+    /// Deletes multiple sessions completely (audio + data) in a single save.
+    @discardableResult
+    func deleteSessionsCompletely(sessionIds: Set<UUID>) -> Int {
+        var count = 0
+        for sessionId in sessionIds {
+            guard let session = fetchSession(id: sessionId) else { continue }
+            fileStore.deleteSessionAudioDir(sessionId: session.id ?? sessionId)
+            context.delete(session)
+            count += 1
+        }
+        saveOrLog()
+        return count
+    }
+
+    /// Deletes audio only for multiple sessions, preserving transcripts.
+    @discardableResult
+    func deleteAudioKeepTranscript(sessionIds: Set<UUID>) -> Int {
+        var count = 0
+        for sessionId in sessionIds {
+            guard let session = fetchSession(id: sessionId),
+                  session.audioKept else { continue }
+            for chunk in session.chunksArray {
+                if let path = chunk.relativePath {
+                    fileStore.deleteFile(relativePath: path)
+                }
+                chunk.audioDeleted = true
+                chunk.relativePath = nil
+            }
+            session.audioKept = false
+            fileStore.deleteSessionAudioDir(sessionId: session.id ?? sessionId)
+            count += 1
+        }
+        saveOrLog()
+        return count
+    }
+
     // MARK: - Fetch
 
     func fetchAllSessions() -> [SessionEntity] {

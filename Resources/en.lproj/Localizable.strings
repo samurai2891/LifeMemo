@@ -1,0 +1,454 @@
+/* Localizable.strings (English) - LifeMemo */
+
+/* ===== Common ===== */
+"OK" = "OK";
+"Cancel" = "Cancel";
+"Delete" = "Delete";
+"Done" = "Done";
+"Error" = "Error";
+"Share" = "Share";
+"Back" = "Back";
+"Continue" = "Continue";
+
+/* ===== Home ===== */
+"LifeMemo" = "LifeMemo";
+"Search sessions..." = "Search sessions...";
+"No Sessions Yet" = "No Sessions Yet";
+"Start your first recording session to capture and transcribe audio." = "Start your first recording session to capture and transcribe audio.";
+"View Recording" = "View Recording";
+"Start Recording" = "Start Recording";
+"Select Language" = "Select Language";
+"Idle" = "Idle";
+"Recording" = "Recording";
+"Processing" = "Processing";
+"Ready" = "Ready";
+"Audio removed" = "Audio removed";
+"Summary" = "Summary";
+"Untitled" = "Untitled";
+
+/* ===== Recording ===== */
+"LIVE" = "LIVE";
+"REC" = "REC";
+"chunks" = "chunks";
+"Highlight" = "Highlight";
+"Stop" = "Stop";
+"Pause" = "Pause";
+"Resume" = "Resume";
+"Live Transcription" = "Live Transcription";
+"Listening..." = "Listening...";
+"Transcription paused" = "Transcription paused";
+
+/* ===== Playback ===== */
+"Session not found" = "Session not found";
+"Audio has been deleted for this session" = "Audio has been deleted for this session";
+"No playable audio chunks found" = "No playable audio chunks found";
+"Speaker %lld" = "Speaker %lld";
+
+/* ===== Settings ===== */
+"Settings" = "Settings";
+"Language" = "Language";
+"Recognition Mode" = "Recognition Mode";
+"Transcription" = "Transcription";
+"Select the language for speech recognition. Server Allowed mode improves accuracy for mixed languages but audio may be sent to Apple." = "Select the language for speech recognition. Server Allowed mode improves accuracy for mixed languages but audio may be sent to Apple.";
+"Permissions" = "Permissions";
+"Microphone" = "Microphone";
+"Speech Recognition" = "Speech Recognition";
+"Granted" = "Granted";
+"Denied" = "Denied";
+"Not Requested" = "Not Requested";
+"Open System Settings" = "Open System Settings";
+"Both permissions are required for recording and transcription." = "Both permissions are required for recording and transcription.";
+"Audio Quality" = "Audio Quality";
+"Recording Quality" = "Recording Quality";
+"Summarization" = "Summarization";
+"Default Algorithm" = "Default Algorithm";
+"Auto-Summarize" = "Auto-Summarize";
+"Run Benchmark" = "Run Benchmark";
+"On-device extractive summarization using Apple NaturalLanguage. No data leaves your device. Auto-Summarize generates a summary when transcription completes." = "On-device extractive summarization using Apple NaturalLanguage. No data leaves your device. Auto-Summarize generates a summary when transcription completes.";
+"Data" = "Data";
+"Storage" = "Storage";
+"Location" = "Location";
+"Capture Location" = "Capture Location";
+"Accuracy" = "Accuracy";
+"Capture Timing" = "Capture Timing";
+"Place Name Lookup" = "Place Name Lookup";
+"Location data stays on your device. Place Name Lookup uses a brief network request to convert coordinates to a readable name." = "Location data stays on your device. Place Name Lookup uses a brief network request to convert coordinates to a readable name.";
+"When enabled, the approximate location will be saved when starting a recording. Location data stays on your device." = "When enabled, the approximate location will be saved when starting a recording. Location data stays on your device.";
+"Privacy" = "Privacy";
+"On-Device Processing" = "On-Device Processing";
+"All audio recording and speech recognition happens locally on your device. No data is sent to any server." = "All audio recording and speech recognition happens locally on your device. No data is sent to any server.";
+"Audio is recorded locally. Speech recognition may use Apple's servers for improved accuracy when Server Allowed mode is enabled." = "Audio is recorded locally. Speech recognition may use Apple's servers for improved accuracy when Server Allowed mode is enabled.";
+"Data Control" = "Data Control";
+"You can delete audio files while keeping transcripts, or delete entire sessions at any time." = "You can delete audio files while keeping transcripts, or delete entire sessions at any time.";
+"Support" = "Support";
+"Export Logs" = "Export Logs";
+"Export diagnostic logs for troubleshooting. No personal data is included." = "Export diagnostic logs for troubleshooting. No personal data is included.";
+"About" = "About";
+"Version" = "Version";
+"Build" = "Build";
+"LifeMemo - Always-on voice recorder with on-device transcription." = "LifeMemo - Always-on voice recorder with on-device transcription.";
+
+/* ===== Settings - Benchmark ===== */
+"Summarization Benchmark" = "Summarization Benchmark";
+"Start Benchmark" = "Start Benchmark";
+
+/* ===== Session Detail ===== */
+"Untitled Session" = "Untitled Session";
+"Transcript" = "Transcript";
+"No transcript yet" = "No transcript yet";
+"Details" = "Details";
+"Started" = "Started";
+"Ended" = "Ended";
+"Duration" = "Duration";
+"Chunks" = "Chunks";
+"Audio" = "Audio";
+"Kept" = "Kept";
+"Deleted" = "Deleted";
+"Tags" = "Tags";
+"Folder" = "Folder";
+"None" = "None";
+"Add to Folder" = "Add to Folder";
+"Highlights" = "Highlights";
+"No highlights" = "No highlights";
+"Edit Session" = "Edit Session";
+"Title" = "Title";
+"Session Title" = "Session Title";
+"Notes" = "Notes";
+"Add notes..." = "Add notes...";
+"Save" = "Save";
+"Delete Session" = "Delete Session";
+"Delete Audio Only" = "Delete Audio Only";
+"This will permanently delete this session and all its data. This cannot be undone." = "This will permanently delete this session and all its data. This cannot be undone.";
+"Audio files will be deleted but transcripts will be preserved." = "Audio files will be deleted but transcripts will be preserved.";
+"Summarize" = "Summarize";
+"Export" = "Export";
+"Playback" = "Playback";
+"Manage Speakers" = "Manage Speakers";
+
+/* ===== Speaker Management ===== */
+"Speaker Management" = "Speaker Management";
+"Rename speakers to identify participants in the conversation." = "Rename speakers to identify participants in the conversation.";
+
+/* ===== Edit History ===== */
+"Edit History" = "Edit History";
+"No edit history" = "No edit history";
+"Original" = "Original";
+
+/* ===== Search ===== */
+"Search" = "Search";
+"Search transcripts..." = "Search transcripts...";
+"Filters" = "Filters";
+"Date Range" = "Date Range";
+"From" = "From";
+"To" = "To";
+"Highlights Only" = "Highlights Only";
+"Has Audio" = "Has Audio";
+"Sort By" = "Sort By";
+"Clear Filters" = "Clear Filters";
+"No results found" = "No results found";
+"Advanced Search" = "Advanced Search";
+
+/* ===== Tags ===== */
+"Existing Tags" = "Existing Tags";
+"No tags yet. Create one below." = "No tags yet. Create one below.";
+"Create New Tag" = "Create New Tag";
+"Tag name" = "Tag name";
+
+/* ===== Folder Picker ===== */
+"Move to Folder" = "Move to Folder";
+"No Folder" = "No Folder";
+"New Folder" = "New Folder";
+"Folder name" = "Folder name";
+"Create" = "Create";
+
+/* ===== Backup ===== */
+"Create Backup" = "Create Backup";
+"Backup Created" = "Backup Created";
+"Your encrypted backup has been created successfully." = "Your encrypted backup has been created successfully.";
+"Backup Failed" = "Backup Failed";
+"Deselect All" = "Deselect All";
+"Select All" = "Select All";
+"Include Audio Files" = "Include Audio Files";
+"Options" = "Options";
+"Audio files significantly increase backup size. Transcripts are always included." = "Audio files significantly increase backup size. Transcripts are always included.";
+"Password" = "Password";
+"Confirm Password" = "Confirm Password";
+"Encryption Password" = "Encryption Password";
+"You will need this password to restore the backup. It cannot be recovered." = "You will need this password to restore the backup. It cannot be recovered.";
+"Create Encrypted Backup" = "Create Encrypted Backup";
+
+/* ===== Restore ===== */
+"Restore Backup" = "Restore Backup";
+"Restore Complete" = "Restore Complete";
+"Your backup has been restored successfully." = "Your backup has been restored successfully.";
+"Restore Failed" = "Restore Failed";
+"Select Backup File" = "Select Backup File";
+"Backup File" = "Backup File";
+"Select a .lifememobackup file to restore." = "Select a .lifememobackup file to restore.";
+"Backup Password" = "Backup Password";
+"Enter the password used when creating the backup." = "Enter the password used when creating the backup.";
+"Restore" = "Restore";
+"Existing sessions with the same ID will be skipped. Your current data will not be affected." = "Existing sessions with the same ID will be skipped. Your current data will not be affected.";
+"Could not access the selected file." = "Could not access the selected file.";
+
+/* ===== Export ===== */
+"Export Options" = "Export Options";
+"Export Error" = "Export Error";
+"Format" = "Format";
+"Markdown" = "Markdown";
+"Text" = "Text";
+"PDF" = "PDF";
+"JSON" = "JSON";
+"Rich formatting with headers and lists. Compatible with note-taking apps." = "Rich formatting with headers and lists. Compatible with note-taking apps.";
+"Plain text format. Compatible with all text editors." = "Plain text format. Compatible with all text editors.";
+"Formatted document with typography. Ready to print or share." = "Formatted document with typography. Ready to print or share.";
+"Structured data format. Ideal for programmatic access and data portability." = "Structured data format. Ideal for programmatic access and data portability.";
+"Session Metadata" = "Session Metadata";
+"Keywords" = "Keywords";
+"Full Transcript" = "Full Transcript";
+"Timestamps" = "Timestamps";
+"Content" = "Content";
+"Select which sections to include in the exported file." = "Select which sections to include in the exported file.";
+"Exporting..." = "Exporting...";
+
+/* ===== Onboarding ===== */
+"Welcome to LifeMemo" = "Welcome to LifeMemo";
+"Your always-on voice recorder with on-device transcription. Capture every important moment, hands-free." = "Your always-on voice recorder with on-device transcription. Capture every important moment, hands-free.";
+"Your Privacy Matters" = "Your Privacy Matters";
+"On-Device Only" = "On-Device Only";
+"All audio and transcription stays on your device. Nothing is uploaded to any server." = "All audio and transcription stays on your device. Nothing is uploaded to any server.";
+"Always-On Recording" = "Always-On Recording";
+"LifeMemo records continuously while active. A visible indicator is always shown." = "LifeMemo records continuously while active. A visible indicator is always shown.";
+"You Control Your Data" = "You Control Your Data";
+"Delete audio files at any time while keeping transcripts, or delete everything." = "Delete audio files at any time while keeping transcripts, or delete everything.";
+"Always-On Consent" = "Always-On Consent";
+"LifeMemo continuously records audio while a session is active. This is essential for capturing everything without manual intervention." = "LifeMemo continuously records audio while a session is active. This is essential for capturing everything without manual intervention.";
+"I understand and consent" = "I understand and consent";
+"I agree that LifeMemo will record audio continuously during active sessions." = "I agree that LifeMemo will record audio continuously during active sessions.";
+"Permissions Required" = "Permissions Required";
+"LifeMemo needs access to your microphone and speech recognition to record and transcribe audio." = "LifeMemo needs access to your microphone and speech recognition to record and transcribe audio.";
+"Permissions Granted" = "Permissions Granted";
+"Grant Permissions" = "Grant Permissions";
+"Open Settings" = "Open Settings";
+"Not Set" = "Not Set";
+"Protect Your Data" = "Protect Your Data";
+"Enable App Lock to require authentication (Face ID, Touch ID, or passcode) when opening LifeMemo." = "Enable App Lock to require authentication (Face ID, Touch ID, or passcode) when opening LifeMemo.";
+"You can change this later in Settings." = "You can change this later in Settings.";
+"You're All Set!" = "You're All Set!";
+"Start your first recording session and let LifeMemo capture everything for you." = "Start your first recording session and let LifeMemo capture everything for you.";
+"Get Started" = "Get Started";
+
+/* ===== Storage ===== */
+"Calculating..." = "Calculating...";
+"Total" = "Total";
+"Storage Usage" = "Storage Usage";
+"Audio Files" = "Audio Files";
+"Database" = "Database";
+"Exports" = "Exports";
+"Search Index" = "Search Index";
+"Breakdown" = "Breakdown";
+"Free Space" = "Free Space";
+"Device" = "Device";
+"No sessions recorded yet" = "No sessions recorded yet";
+"Sessions by Audio Size" = "Sessions by Audio Size";
+"Sorted by audio file size, largest first." = "Sorted by audio file size, largest first.";
+"No audio" = "No audio";
+"Delete Audio Older Than %@" = "Delete Audio Older Than %@";
+"Delete All Exports" = "Delete All Exports";
+"Cleanup" = "Cleanup";
+"Deleting audio keeps transcripts intact. This cannot be undone." = "Deleting audio keeps transcripts intact. This cannot be undone.";
+"No backups yet" = "No backups yet";
+"Backups" = "Backups";
+"Auto-Delete Old Audio" = "Auto-Delete Old Audio";
+"Current Usage" = "Current Usage";
+"Storage Limit" = "Storage Limit";
+"When auto-delete is enabled, the oldest audio files will be removed when storage exceeds the limit." = "When auto-delete is enabled, the oldest audio files will be removed when storage exceeds the limit.";
+"Backup & Restore" = "Backup & Restore";
+"Delete Audio" = "Delete Audio";
+"Delete Backup" = "Delete Backup";
+"Backup Created" = "Backup Created";
+"Cleanup Complete" = "Cleanup Complete";
+"No data" = "No data";
+"7 days" = "7 days";
+"30 days" = "30 days";
+"90 days" = "90 days";
+"180 days" = "180 days";
+
+/* ===== Storage Cleanup Guide ===== */
+"Cleanup Guide" = "Cleanup Guide";
+"Delete Old Audio" = "Delete Old Audio";
+"Delete Audio Older Than 30 Days" = "Delete Audio Older Than 30 Days";
+"Delete Audio Older Than 7 Days" = "Delete Audio Older Than 7 Days";
+"Usage" = "Usage";
+"Storage limit exceeded. Consider cleaning up old recordings." = "Storage limit exceeded. Consider cleaning up old recordings.";
+"Approaching storage limit." = "Approaching storage limit.";
+"Remove old audio files" = "Remove old audio files";
+"Transcripts will be preserved" = "Transcripts will be preserved";
+"Delete exported files" = "Delete exported files";
+"Re-export anytime from sessions" = "Re-export anytime from sessions";
+"Recommendations" = "Recommendations";
+"Clean Up Old Audio" = "Clean Up Old Audio";
+"Actions" = "Actions";
+"Deleting audio preserves all transcripts and session data." = "Deleting audio preserves all transcripts and session data.";
+
+/* ===== Security ===== */
+"App Lock" = "App Lock";
+"Security" = "Security";
+"When enabled, LifeMemo will require authentication each time you return to the app." = "When enabled, LifeMemo will require authentication each time you return to the app.";
+"Authentication Required" = "Authentication Required";
+"Could not verify your identity. App Lock was not enabled." = "Could not verify your identity. App Lock was not enabled.";
+"Locked" = "Locked";
+"Authentication failed. Please try again." = "Authentication failed. Please try again.";
+"Unlock" = "Unlock";
+"Passcode" = "Passcode";
+
+/* ===== Domain Models - LanguageMode ===== */
+"Auto" = "Auto";
+"Japanese" = "Japanese";
+"English" = "English";
+
+/* ===== Domain Models - RecognitionMode ===== */
+"On-Device (Privacy)" = "On-Device (Privacy)";
+"Server Allowed (Quality)" = "Server Allowed (Quality)";
+"Audio never leaves the device. Best for privacy." = "Audio never leaves the device. Best for privacy.";
+"Better accuracy for mixed languages. Audio may be sent to Apple." = "Better accuracy for mixed languages. Audio may be sent to Apple.";
+
+/* ===== Domain Models - AudioConfiguration.QualityProfile ===== */
+"Battery Saver" = "Battery Saver";
+"Standard" = "Standard";
+"High Quality" = "High Quality";
+"Lower quality, significantly less battery usage" = "Lower quality, significantly less battery usage";
+"Good quality voice recording, balanced battery" = "Good quality voice recording, balanced battery";
+"Best quality, higher battery usage" = "Best quality, higher battery usage";
+
+/* ===== Domain Models - SummarizationAlgorithm ===== */
+"TF-IDF" = "TF-IDF";
+"TextRank" = "TextRank";
+"Lead-Based" = "Lead-Based";
+"Term Frequency-Inverse Document Frequency scoring with position, length, and entity density signals." = "Term Frequency-Inverse Document Frequency scoring with position, length, and entity density signals.";
+"Graph-based ranking using sentence similarity, inspired by Google's PageRank algorithm." = "Graph-based ranking using sentence similarity, inspired by Google's PageRank algorithm.";
+"Prioritizes sentences by position, weighting early sentences as most important." = "Prioritizes sentences by position, weighting early sentences as most important.";
+
+/* ===== Domain Models - LocationPreference ===== */
+"Approximate (~3km)" = "Approximate (~3km)";
+"Balanced (~100m)" = "Balanced (~100m)";
+"Precise (~10m)" = "Precise (~10m)";
+"Recording Start" = "Recording Start";
+"Recording Stop" = "Recording Stop";
+"Start & Stop" = "Start & Stop";
+
+/* ===== Domain Models - SearchFilter.SortOrder ===== */
+"Newest First" = "Newest First";
+"Oldest First" = "Oldest First";
+"Most Relevant" = "Most Relevant";
+
+/* ===== TranscriptionCapabilityChecker ===== */
+"On-device transcription is available." = "On-device transcription is available.";
+"Speech recognition is not supported for this language on this device." = "Speech recognition is not supported for this language on this device.";
+"Speech recognizer is not available. Please check your device settings." = "Speech recognizer is not available. Please check your device settings.";
+"On-device speech model is not downloaded. Go to Settings > General > Keyboard > Dictation to download the language model." = "On-device speech model is not downloaded. Go to Settings > General > Keyboard > Dictation to download the language model.";
+
+/* ===== Home - Batch Delete ===== */
+"Delete Selected (%lld)" = "Delete Selected (%lld)";
+"Delete %lld Session(s)" = "Delete %lld Session(s)";
+"Delete Sessions" = "Delete Sessions";
+"Choose how to delete the selected sessions. Deleting audio only preserves transcripts." = "Choose how to delete the selected sessions. Deleting audio only preserves transcripts.";
+"Batch Operation Complete" = "Batch Operation Complete";
+
+/* ===== Home - Additional ===== */
+"Loading sessions..." = "Loading sessions...";
+"All" = "All";
+
+/* ===== Session Detail - Additional ===== */
+"Session Detail" = "Session Detail";
+"Rebuild" = "Rebuild";
+"Generate" = "Generate";
+"Play Audio" = "Play Audio";
+"Export TXT" = "Export TXT";
+"Remove Audio" = "Remove Audio";
+"No Audio" = "No Audio";
+"Loading session..." = "Loading session...";
+"No summary available. Tap Generate to create one." = "No summary available. Tap Generate to create one.";
+"No notes yet. Tap Edit to add some." = "No notes yet. Tap Edit to add some.";
+"No relevant segments found for this question." = "No relevant segments found for this question.";
+"No transcript available yet." = "No transcript available yet.";
+"No chunks recorded." = "No chunks recorded.";
+"Searching..." = "Searching...";
+"Show original" = "Show original";
+
+/* ===== Edit History - Additional ===== */
+"No edit history available for this segment." = "No edit history available for this segment.";
+"Original Text" = "Original Text";
+"Current Text" = "Current Text";
+"Current" = "Current";
+
+/* ===== Search - Additional ===== */
+"Try different keywords or adjust your filters" = "Try different keywords or adjust your filters";
+"Tag:" = "Tag:";
+"Folder:" = "Folder:";
+"From:" = "From:";
+"To:" = "To:";
+"Any" = "Any";
+
+/* ===== Folder Picker - Additional ===== */
+"Select Folder" = "Select Folder";
+
+/* ===== Storage - Additional ===== */
+"Backups contain the database only, not audio files." = "Backups contain the database only, not audio files.";
+"This will permanently delete all exported files. This cannot be undone." = "This will permanently delete all exported files. This cannot be undone.";
+
+/* ===== Security - Additional ===== */
+"Require %@ to open LifeMemo" = "Require %@ to open LifeMemo";
+
+/* ===== Storage - Dynamic Messages ===== */
+"Deleted audio for %lld session(s)." = "Deleted audio for %lld session(s).";
+"No sessions found older than %@ with audio." = "No sessions found older than %@ with audio.";
+"Removed audio from %lld session(s). Transcripts preserved." = "Removed audio from %lld session(s). Transcripts preserved.";
+"No old audio files found to clean up." = "No old audio files found to clean up.";
+"Backup saved as \"%@\"." = "Backup saved as \"%@\".";
+"This will permanently delete the backup \"%@\". This cannot be undone." = "This will permanently delete the backup \"%@\". This cannot be undone.";
+"This will permanently delete audio files for sessions older than %@. Transcripts will be preserved. This cannot be undone." = "This will permanently delete audio files for sessions older than %@. Transcripts will be preserved. This cannot be undone.";
+"and %lld more sessions..." = "and %lld more sessions...";
+"Older Than" = "Older Than";
+
+/* ===== Session Detail - More ===== */
+"Session Not Found" = "Session Not Found";
+"This session may have been deleted." = "This session may have been deleted.";
+"Audio is not available for playback." = "Audio is not available for playback.";
+"Delete Audio, Keep Transcript" = "Delete Audio, Keep Transcript";
+"Audio files will be permanently deleted. Transcripts will be preserved." = "Audio files will be permanently deleted. Transcripts will be preserved.";
+"Delete Everything" = "Delete Everything";
+"This will permanently delete the session, audio, and all transcripts." = "This will permanently delete the session, audio, and all transcripts.";
+"Audio Removed" = "Audio Removed";
+"No tags assigned." = "No tags assigned.";
+"Algorithm" = "Algorithm";
+"Edit" = "Edit";
+"Ask a Question" = "Ask a Question";
+"Ask about this session..." = "Ask about this session...";
+"Clear" = "Clear";
+"Speakers" = "Speakers";
+"edited" = "edited";
+"Retry All" = "Retry All";
+
+/* ===== Session Detail ViewModel ===== */
+"Session not found." = "Session not found.";
+"Audio file has been deleted. Cannot retranscribe." = "Audio file has been deleted. Cannot retranscribe.";
+"Pending" = "Pending";
+"Transcribing" = "Transcribing";
+"Failed" = "Failed";
+
+/* ===== Edit History - More ===== */
+"No Edit History" = "No Edit History";
+"Revert to original" = "Revert to original";
+"Edits" = "Edits";
+"Revert to this version" = "Revert to this version";
+
+/* ===== Search - More ===== */
+"Load More" = "Load More";
+"Clear Dates" = "Clear Dates";
+"Tags & Folders" = "Tags & Folders";
+"Tag" = "Tag";
+"Sort" = "Sort";
+"Sort Order" = "Sort Order";
+"Search Filters" = "Search Filters";
+"Apply" = "Apply";

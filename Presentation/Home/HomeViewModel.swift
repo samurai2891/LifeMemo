@@ -13,6 +13,9 @@ final class HomeViewModel: ObservableObject {
 
     @Published var searchQuery: String = ""
     @Published var selectedFolderFilter: FolderInfo? = nil
+    @Published var selectedSessionIds: Set<UUID> = []
+    @Published var showBatchDeleteConfirm: Bool = false
+    @Published var batchResultMessage: String? = nil
     @Published private(set) var sessions: [SessionSummary] = []
     @Published private(set) var filteredSessions: [SessionSummary] = []
     @Published private(set) var availableFolders: [FolderInfo] = []
@@ -52,6 +55,60 @@ final class HomeViewModel: ObservableObject {
         repository.deleteSessionCompletely(sessionId: sessionId)
         sessions = sessions.filter { $0.id != sessionId }
         applyFilter()
+    }
+
+    // MARK: - Batch Selection
+
+    var selectedCount: Int { selectedSessionIds.count }
+
+    var allFilteredSelected: Bool {
+        !filteredSessions.isEmpty
+            && filteredSessions.allSatisfy { selectedSessionIds.contains($0.id) }
+    }
+
+    func selectAll() {
+        selectedSessionIds = Set(filteredSessions.map(\.id))
+    }
+
+    func deselectAll() {
+        selectedSessionIds = []
+    }
+
+    func toggleSelectAll() {
+        if allFilteredSelected {
+            deselectAll()
+        } else {
+            selectAll()
+        }
+    }
+
+    func requestBatchDelete() {
+        guard !selectedSessionIds.isEmpty else { return }
+        showBatchDeleteConfirm = true
+    }
+
+    func batchDeleteCompletely() {
+        let count = repository.deleteSessionsCompletely(sessionIds: selectedSessionIds)
+        sessions = sessions.filter { !selectedSessionIds.contains($0.id) }
+        selectedSessionIds = []
+        applyFilter()
+        batchResultMessage = String(
+            format: NSLocalizedString("Delete %lld Session(s)", comment: ""),
+            count
+        )
+    }
+
+    func batchDeleteAudioOnly() {
+        let count = repository.deleteAudioKeepTranscript(sessionIds: selectedSessionIds)
+        selectedSessionIds = []
+        loadSessions()
+        batchResultMessage = String(
+            format: NSLocalizedString(
+                "Removed audio from %lld session(s). Transcripts preserved.",
+                comment: ""
+            ),
+            count
+        )
     }
 
     // MARK: - Search
