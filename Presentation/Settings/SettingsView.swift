@@ -64,6 +64,20 @@ struct SettingsView: View {
             }
             .pickerStyle(.menu)
 
+            Picker("Recognition Mode", selection: $viewModel.recognitionMode) {
+                ForEach(RecognitionMode.allCases) { mode in
+                    VStack(alignment: .leading) {
+                        Text(mode.displayName)
+                    }
+                    .tag(mode)
+                }
+            }
+            .pickerStyle(.menu)
+
+            Text(viewModel.recognitionMode.description)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             if !viewModel.transcriptionCapability.isAvailable {
                 Label {
                     Text(viewModel.transcriptionCapability.userMessage)
@@ -76,7 +90,7 @@ struct SettingsView: View {
         } header: {
             Text("Transcription")
         } footer: {
-            Text("Select the language for speech recognition. Only Japanese and English are supported for on-device transcription.")
+            Text("Select the language for speech recognition. Server Allowed mode improves accuracy for mixed languages but audio may be sent to Apple.")
         }
     }
 
@@ -270,13 +284,15 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("On-Device Processing")
                         .font(.subheadline)
-                    Text("All audio recording and speech recognition happens locally on your device. No data is sent to any server.")
+                    Text(viewModel.recognitionMode == .onDevice
+                         ? "All audio recording and speech recognition happens locally on your device. No data is sent to any server."
+                         : "Audio is recorded locally. Speech recognition may use Apple's servers for improved accuracy when Server Allowed mode is enabled.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             } icon: {
-                Image(systemName: "lock.shield.fill")
-                    .foregroundStyle(.green)
+                Image(systemName: viewModel.recognitionMode == .onDevice ? "lock.shield.fill" : "network")
+                    .foregroundStyle(viewModel.recognitionMode == .onDevice ? .green : .orange)
             }
 
             Label {

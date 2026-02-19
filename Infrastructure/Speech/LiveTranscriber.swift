@@ -41,11 +41,17 @@ final class LiveTranscriber: ObservableObject {
         currentLocale = locale
         speechRecognizer = SFSpeechRecognizer(locale: locale)
 
-        guard let recognizer = speechRecognizer,
-              recognizer.isAvailable,
-              recognizer.supportsOnDeviceRecognition else {
-            state = .error("On-device recognition not available")
+        guard let recognizer = speechRecognizer, recognizer.isAvailable else {
+            state = .error("Speech recognition not available")
             return
+        }
+
+        let mode = RecognitionMode.load()
+        if mode.requiresOnDevice {
+            guard recognizer.supportsOnDeviceRecognition else {
+                state = .error("On-device recognition not available")
+                return
+            }
         }
 
         do {
@@ -99,9 +105,25 @@ final class LiveTranscriber: ObservableObject {
         recognitionTask?.cancel()
         recognitionRequest = nil
 
+        let mode = RecognitionMode.load()
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
-        request.requiresOnDeviceRecognition = true
+        request.requiresOnDeviceRecognition = mode.requiresOnDevice
+        request.addsPunctuation = true
+        request.taskHint = .dictation
+
+        // Provide recent confirmed text as contextual hints for better accuracy
+        if !confirmedSegments.isEmpty {
+            let recentWords = confirmedSegments.suffix(3)
+                .joined(separator: " ")
+                .split(separator: " ")
+                .suffix(100)
+                .map(String.init)
+            if !recentWords.isEmpty {
+                request.contextualStrings = recentWords
+            }
+        }
+
         recognitionRequest = request
 
         let inputNode = audioEngine.inputNode

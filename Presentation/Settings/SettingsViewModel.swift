@@ -25,6 +25,12 @@ final class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var recognitionMode: RecognitionMode {
+        didSet {
+            RecognitionMode.save(recognitionMode, defaults: defaults)
+        }
+    }
+
     // MARK: - Dependencies
 
     private let defaults: UserDefaults
@@ -51,6 +57,7 @@ final class SettingsViewModel: ObservableObject {
         let raw = defaults.string(forKey: Self.languageKey) ?? "auto"
         self.selectedLanguageMode = LanguageMode(rawValue: raw) ?? .auto
         self.audioQualityProfile = AudioConfiguration.loadProfile()
+        self.recognitionMode = RecognitionMode.load(defaults: defaults)
     }
 
     // MARK: - Actions

@@ -38,11 +38,15 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
     private static let transcriptionTimeoutNs: UInt64 = 120_000_000_000
 
     func transcribeFileWithSegments(url: URL, locale: Locale) async throws -> TranscriptionDetail {
+        let mode = RecognitionMode.load()
+
         guard let recognizer = SFSpeechRecognizer(locale: locale) else {
             throw TranscriptionError.unsupportedLocale
         }
-        guard recognizer.supportsOnDeviceRecognition else {
-            throw TranscriptionError.onDeviceNotSupported
+        if mode.requiresOnDevice {
+            guard recognizer.supportsOnDeviceRecognition else {
+                throw TranscriptionError.onDeviceNotSupported
+            }
         }
 
         return try await withThrowingTaskGroup(of: TranscriptionDetail.self) { group in
@@ -50,8 +54,10 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
             group.addTask {
                 try await withCheckedThrowingContinuation { continuation in
                     let request = SFSpeechURLRecognitionRequest(url: url)
-                    request.requiresOnDeviceRecognition = true
+                    request.requiresOnDeviceRecognition = mode.requiresOnDevice
                     request.shouldReportPartialResults = false
+                    request.addsPunctuation = true
+                    request.taskHint = .dictation
 
                     var hasResumed = false
 
