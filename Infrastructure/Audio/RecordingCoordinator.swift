@@ -107,8 +107,9 @@ final class RecordingCoordinator: ObservableObject {
             locationService.captureCurrentLocation()
         }
 
-        // Stop live transcription preview
+        // Stop live transcription preview and clear memory
         liveTranscriber.stop()
+        liveTranscriber.reset()
 
         Task {
             await chunkRecorder.stop()

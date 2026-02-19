@@ -15,17 +15,17 @@ struct AudioConfiguration: Codable, Equatable {
 
         var displayName: String {
             switch self {
-            case .low: return "Battery Saver"
-            case .standard: return "Standard"
-            case .high: return "High Quality"
+            case .low: return String(localized: "Battery Saver")
+            case .standard: return String(localized: "Standard")
+            case .high: return String(localized: "High Quality")
             }
         }
 
         var description: String {
             switch self {
-            case .low: return "Lower quality, significantly less battery usage"
-            case .standard: return "Good quality voice recording, balanced battery"
-            case .high: return "Best quality, higher battery usage"
+            case .low: return String(localized: "Lower quality, significantly less battery usage")
+            case .standard: return String(localized: "Good quality voice recording, balanced battery")
+            case .high: return String(localized: "Best quality, higher battery usage")
             }
         }
     }

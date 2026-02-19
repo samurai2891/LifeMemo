@@ -20,9 +20,9 @@ struct SearchFilter: Equatable {
 
         var displayName: String {
             switch self {
-            case .newest: return "Newest First"
-            case .oldest: return "Oldest First"
-            case .relevance: return "Most Relevant"
+            case .newest: return String(localized: "Newest First")
+            case .oldest: return String(localized: "Oldest First")
+            case .relevance: return String(localized: "Most Relevant")
             }
         }
     }

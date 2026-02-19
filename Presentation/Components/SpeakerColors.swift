@@ -16,6 +16,6 @@ enum SpeakerColors {
 
     /// Returns a default display name such as "Speaker 1", "Speaker 2", etc.
     static func defaultName(for index: Int) -> String {
-        "Speaker \(index + 1)"
+        String(localized: "Speaker \(index + 1)")
     }
 }

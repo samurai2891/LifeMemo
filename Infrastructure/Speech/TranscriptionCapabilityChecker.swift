@@ -21,15 +21,13 @@ final class TranscriptionCapabilityChecker {
         var userMessage: String {
             switch self {
             case .available:
-                return "On-device transcription is available."
+                return String(localized: "On-device transcription is available.")
             case .unavailableNoRecognizer:
-                return "Speech recognition is not supported for this language on this device."
+                return String(localized: "Speech recognition is not supported for this language on this device.")
             case .unavailableNotReady:
-                return "Speech recognizer is not available. Please check your device settings."
+                return String(localized: "Speech recognizer is not available. Please check your device settings.")
             case .unavailableNoOnDevice:
-                return "On-device speech model is not downloaded. "
-                    + "Go to Settings > General > Keyboard > Dictation "
-                    + "to download the language model."
+                return String(localized: "On-device speech model is not downloaded. Go to Settings > General > Keyboard > Dictation to download the language model.")
             }
         }
     }

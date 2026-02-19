@@ -24,7 +24,7 @@ final class LiveTranscriber: ObservableObject {
 
     @Published private(set) var state: State = .idle
     @Published private(set) var partialText: String = ""
-    @Published private(set) var confirmedSegments: [String] = []
+    @Published private(set) var confirmedSegments: [LiveSegment] = []
 
     // MARK: - Private
 
@@ -34,12 +34,15 @@ final class LiveTranscriber: ObservableObject {
     private var speechRecognizer: SFSpeechRecognizer?
     private var restartTimer: Timer?
     private var currentLocale: Locale = .current
+    private var nextCycleIndex: Int = 0
 
     // MARK: - Lifecycle
 
     func start(locale: Locale) {
         currentLocale = locale
         speechRecognizer = SFSpeechRecognizer(locale: locale)
+        confirmedSegments = []
+        nextCycleIndex = 0
 
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {
             state = .error("Speech recognition not available")
@@ -68,6 +71,14 @@ final class LiveTranscriber: ObservableObject {
         stopRecognition()
         state = .idle
         partialText = ""
+        // confirmedSegments are cleared separately via reset() after coordinator cleanup
+    }
+
+    /// Clears all accumulated segments from memory. Called by the coordinator
+    /// after the ViewModel has captured the segments.
+    func reset() {
+        confirmedSegments = []
+        nextCycleIndex = 0
     }
 
     func pause() {
@@ -91,11 +102,19 @@ final class LiveTranscriber: ObservableObject {
     }
 
     var fullText: String {
-        let confirmed = confirmedSegments.joined(separator: " ")
+        let confirmed = confirmedSegments.map(\.text).joined(separator: " ")
         if partialText.isEmpty {
             return confirmed
         }
         return confirmed.isEmpty ? partialText : confirmed + " " + partialText
+    }
+
+    /// Updates the text of a confirmed segment by ID. Returns a new array with the
+    /// updated segment (immutable pattern). Called from RecordingViewModel on save.
+    func updateSegmentText(id: UUID, newText: String) {
+        confirmedSegments = confirmedSegments.map { segment in
+            segment.id == id ? segment.withText(newText) : segment
+        }
     }
 
     // MARK: - Private
@@ -115,6 +134,7 @@ final class LiveTranscriber: ObservableObject {
         // Provide recent confirmed text as contextual hints for better accuracy
         if !confirmedSegments.isEmpty {
             let recentWords = confirmedSegments.suffix(3)
+                .map(\.text)
                 .joined(separator: " ")
                 .split(separator: " ")
                 .suffix(100)
@@ -143,6 +163,8 @@ final class LiveTranscriber: ObservableObject {
         audioEngine.prepare()
         try audioEngine.start()
 
+        let currentCycle = nextCycleIndex
+
         recognitionTask = recognizer.recognitionTask(
             with: request
         ) { [weak self] result, error in
@@ -155,7 +177,13 @@ final class LiveTranscriber: ObservableObject {
                     if result.isFinal {
                         let finalText = result.bestTranscription.formattedString
                         if !finalText.isEmpty {
-                            self.confirmedSegments.append(finalText)
+                            let segment = LiveSegment(
+                                id: UUID(),
+                                text: finalText,
+                                confirmedAt: Date(),
+                                cycleIndex: currentCycle
+                            )
+                            self.confirmedSegments.append(segment)
                         }
                         self.partialText = ""
                     }
@@ -187,12 +215,19 @@ final class LiveTranscriber: ObservableObject {
     private func restartRecognition() {
         guard state == .listening else { return }
 
-        // Save current partial as confirmed
+        // Save current partial as confirmed segment
         if !partialText.isEmpty {
-            confirmedSegments.append(partialText)
+            let segment = LiveSegment(
+                id: UUID(),
+                text: partialText,
+                confirmedAt: Date(),
+                cycleIndex: nextCycleIndex
+            )
+            confirmedSegments.append(segment)
             partialText = ""
         }
 
+        nextCycleIndex += 1
         stopRecognition()
 
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {

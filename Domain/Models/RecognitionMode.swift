@@ -13,17 +13,17 @@ enum RecognitionMode: String, CaseIterable, Identifiable, Codable {
 
     var displayName: String {
         switch self {
-        case .onDevice: return "On-Device (Privacy)"
-        case .serverAllowed: return "Server Allowed (Quality)"
+        case .onDevice: return String(localized: "On-Device (Privacy)")
+        case .serverAllowed: return String(localized: "Server Allowed (Quality)")
         }
     }
 
     var description: String {
         switch self {
         case .onDevice:
-            return "Audio never leaves the device. Best for privacy."
+            return String(localized: "Audio never leaves the device. Best for privacy.")
         case .serverAllowed:
-            return "Better accuracy for mixed languages. Audio may be sent to Apple."
+            return String(localized: "Better accuracy for mixed languages. Audio may be sent to Apple.")
         }
     }
 

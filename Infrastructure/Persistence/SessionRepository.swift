@@ -261,10 +261,54 @@ final class SessionRepository {
         saveOrLog()
     }
 
+    // MARK: - Live Edit Records
+
+    /// Persists live edit records as JSON on the session entity.
+    func saveLiveEditRecords(sessionId: UUID, records: [LiveEditRecord]) {
+        guard let session = fetchSession(id: sessionId) else { return }
+        guard let data = try? JSONEncoder().encode(records),
+              let json = String(data: data, encoding: .utf8) else { return }
+        session.liveEditsJSON = json
+        saveOrLog()
+    }
+
+    /// Reconciles live edits with final transcription segments, applying matched
+    /// edits and clearing the JSON afterwards. Does not save — caller is responsible.
+    private func applyLiveEdits(for session: SessionEntity) {
+        let records = session.liveEditRecords
+        guard !records.isEmpty else { return }
+
+        let finalSegments = session.segmentsArray.map {
+            (id: $0.id ?? UUID(), text: $0.text ?? "")
+        }
+        let reconciler = LiveEditReconciler()
+        let matches = reconciler.reconcile(editRecords: records, finalSegments: finalSegments)
+
+        for match in matches {
+            guard let segment = fetchSegment(id: match.segmentId) else { continue }
+            let previousText = segment.text ?? ""
+            if !segment.isUserEdited {
+                segment.originalText = previousText
+            }
+            let existingCount = segment.editHistoryArray.count
+            let historyEntry = EditHistoryEntity(context: context)
+            historyEntry.id = UUID()
+            historyEntry.previousText = previousText
+            historyEntry.newText = match.editedText
+            historyEntry.editedAt = Date()
+            historyEntry.editIndex = Int16(existingCount + 1)
+            historyEntry.segment = segment
+            segment.text = match.editedText
+            segment.isUserEdited = true
+        }
+        session.liveEditsJSON = nil
+    }
+
     // MARK: - Session Finalization
 
     /// Checks if all chunks in a session have completed transcription (done or failed).
-    /// If so, transitions the session status from `.processing` to `.ready`.
+    /// If so, applies any pending live edits and transitions the session status
+    /// from `.processing` to `.ready`. Saves atomically in a single operation.
     func checkAndFinalizeSessionStatus(sessionId: UUID) {
         guard let session = fetchSession(id: sessionId) else { return }
         guard session.status == .processing else { return }
@@ -278,6 +322,7 @@ final class SessionRepository {
         }
 
         if allFinished {
+            applyLiveEdits(for: session)
             session.status = .ready
             saveOrLog()
         }

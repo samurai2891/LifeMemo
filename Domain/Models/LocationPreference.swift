@@ -24,9 +24,9 @@ struct LocationPreference {
         
         var displayName: String {
             switch self {
-            case .approximate: return "Approximate (~3km)"
-            case .balanced: return "Balanced (~100m)"
-            case .precise: return "Precise (~10m)"
+            case .approximate: return String(localized: "Approximate (~3km)")
+            case .balanced: return String(localized: "Balanced (~100m)")
+            case .precise: return String(localized: "Precise (~10m)")
             }
         }
         
@@ -50,9 +50,9 @@ struct LocationPreference {
         
         var displayName: String {
             switch self {
-            case .onStart: return "Recording Start"
-            case .onStop: return "Recording Stop"
-            case .both: return "Start & Stop"
+            case .onStart: return String(localized: "Recording Start")
+            case .onStop: return String(localized: "Recording Stop")
+            case .both: return String(localized: "Start & Stop")
             }
         }
     }

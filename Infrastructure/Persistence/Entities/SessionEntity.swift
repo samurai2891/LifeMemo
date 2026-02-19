@@ -17,6 +17,7 @@ public class SessionEntity: NSManagedObject {
     @NSManaged public var longitude: Double
     @NSManaged public var placeName: String?
     @NSManaged public var speakerNamesJSON: String?  // e.g. {"0":"Taro","1":"Hanako"}
+    @NSManaged public var liveEditsJSON: String?
     @NSManaged public var chunks: NSSet?
     @NSManaged public var segments: NSSet?
     @NSManaged public var highlights: NSSet?
@@ -58,6 +59,12 @@ extension SessionEntity {
 
     var hasLocation: Bool {
         latitude != 0 || longitude != 0
+    }
+
+    var liveEditRecords: [LiveEditRecord] {
+        guard let json = liveEditsJSON,
+              let data = json.data(using: .utf8) else { return [] }
+        return (try? JSONDecoder().decode([LiveEditRecord].self, from: data)) ?? []
     }
 
     /// Decoded speaker name mapping (speakerIndex -> custom name).

@@ -9,9 +9,9 @@ enum LanguageMode: String, CaseIterable, Identifiable, Codable {
 
     var displayName: String {
         switch self {
-        case .auto: return "Auto"
-        case .japanese: return "Japanese"
-        case .english: return "English"
+        case .auto: return String(localized: "Auto")
+        case .japanese: return String(localized: "Japanese")
+        case .english: return String(localized: "English")
         }
     }
 

@@ -5,6 +5,7 @@ options:
     iOS: "17.0"
   xcodeVersion: "16.0"
   generateEmptyDirectories: true
+  developmentLanguage: en
 
 settings:
   base:
@@ -42,9 +43,9 @@ targets:
         UILaunchScreen: {}
         UIBackgroundModes:
           - audio
-        NSMicrophoneUsageDescription: "LifeMemoは音声メモを録音するためにマイクを使用します。"
-        NSSpeechRecognitionUsageDescription: "LifeMemoは録音した音声をテキストに変換するために音声認識を使用します。"
-        NSLocationWhenInUseUsageDescription: "LifeMemoは録音に位置情報を記録するために位置情報を使用します。"
+        NSMicrophoneUsageDescription: "LifeMemo uses the microphone to record voice memos."
+        NSSpeechRecognitionUsageDescription: "LifeMemo uses speech recognition to transcribe recorded audio to text."
+        NSLocationWhenInUseUsageDescription: "LifeMemo uses location to tag recordings with where they were made."
     entitlements:
       path: Resources/LifeMemo.entitlements
 

@@ -83,7 +83,7 @@ final class AppLockManagerTests: XCTestCase {
         XCTAssertEqual(AppLockManager.BiometricType.faceID.displayName, "Face ID")
         XCTAssertEqual(AppLockManager.BiometricType.touchID.displayName, "Touch ID")
         XCTAssertEqual(AppLockManager.BiometricType.opticID.displayName, "Optic ID")
-        XCTAssertEqual(AppLockManager.BiometricType.none.displayName, "Passcode")
+        XCTAssertEqual(AppLockManager.BiometricType.none.displayName, String(localized: "Passcode"))
     }
 
     func testBiometricTypeSystemImages() {

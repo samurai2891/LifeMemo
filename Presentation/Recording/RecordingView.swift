@@ -2,9 +2,9 @@ import SwiftUI
 
 /// Full-screen recording view displayed during an active recording session.
 ///
-/// Shows a large elapsed time display, animated waveform visualization,
-/// highlight button with haptic feedback, chunk counter, and a prominent
-/// stop button.
+/// Compact layout with a top bar (REC capsule + elapsed time + chunk counter),
+/// waveform visualization, scrollable live transcript list with inline editing,
+/// and action buttons (highlight + stop).
 struct RecordingView: View {
 
     // MARK: - Environment
@@ -45,42 +45,28 @@ struct RecordingView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 32) {
-                // Top bar
-                topBar
+            VStack(spacing: 0) {
+                // Compact top bar: [v] ●REC 02:35 [N chunks]
+                compactTopBar
+                    .padding(.horizontal)
+                    .padding(.top, 8)
 
-                Spacer()
-
-                // Recording indicator
-                recordingIndicator
-
-                // Elapsed time
-                elapsedTimeDisplay
-
-                // Waveform
+                // Waveform (60pt)
                 waveformView
-                    .frame(height: 80)
-                    .padding(.horizontal, 32)
+                    .frame(height: 60)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
 
-                // Live transcript
-                if !viewModel.liveTranscriptText.isEmpty {
-                    liveTranscriptArea
-                        .frame(maxHeight: 120)
-                        .padding(.horizontal, 16)
-                }
-
-                // Chunk counter
-                chunkCounter
-
-                Spacer()
+                // Live transcript list (flexible — takes remaining space)
+                liveTranscriptList
+                    .padding(.horizontal, 12)
+                    .padding(.top, 12)
 
                 // Action buttons
                 actionButtons
-
-                Spacer()
-                    .frame(height: 24)
+                    .padding(.top, 12)
+                    .padding(.bottom, 24)
             }
-            .padding()
 
             // Highlight flash overlay
             if highlightFlash {
@@ -103,10 +89,11 @@ struct RecordingView: View {
         }
     }
 
-    // MARK: - Top Bar
+    // MARK: - Compact Top Bar
 
-    private var topBar: some View {
+    private var compactTopBar: some View {
         HStack {
+            // Close button
             Button {
                 dismiss()
             } label: {
@@ -118,15 +105,23 @@ struct RecordingView: View {
 
             Spacer()
 
+            // REC capsule with elapsed time
             if coordinator.state.isRecording {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(.red)
                         .frame(width: 8, height: 8)
+                        .shadow(color: .red.opacity(0.6), radius: 4)
 
-                    Text("LIVE")
+                    Text(NSLocalizedString("REC", comment: ""))
                         .font(.caption.bold())
                         .foregroundStyle(.red)
+
+                    Text(RecordingIndicatorOverlay.formatElapsed(coordinator.elapsedSeconds))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.primary)
+                        .contentTransition(.numericText())
+                        .animation(.linear(duration: 0.3), value: coordinator.elapsedSeconds)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
@@ -136,44 +131,10 @@ struct RecordingView: View {
 
             Spacer()
 
-            // Spacer to balance the close button
-            Color.clear.frame(width: 44, height: 44)
+            // Chunk counter
+            chunkCounter
         }
-    }
-
-    // MARK: - Recording Indicator
-
-    private var recordingIndicator: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(.red.opacity(0.1))
-                    .frame(width: 100, height: 100)
-
-                Circle()
-                    .fill(.red.opacity(0.2))
-                    .frame(width: 72, height: 72)
-
-                Circle()
-                    .fill(.red)
-                    .frame(width: 48, height: 48)
-                    .shadow(color: .red.opacity(0.4), radius: 12)
-            }
-
-            Text("Recording")
-                .font(.title3.bold())
-                .foregroundStyle(.red)
-        }
-    }
-
-    // MARK: - Elapsed Time
-
-    private var elapsedTimeDisplay: some View {
-        Text(RecordingIndicatorOverlay.formatElapsed(coordinator.elapsedSeconds))
-            .font(.system(size: 56, weight: .light, design: .monospaced))
-            .foregroundStyle(.primary)
-            .contentTransition(.numericText())
-            .animation(.linear(duration: 0.3), value: coordinator.elapsedSeconds)
+        .frame(height: 44)
     }
 
     // MARK: - Waveform
@@ -189,39 +150,91 @@ struct RecordingView: View {
                             endPoint: .top
                         )
                     )
-                    .frame(width: 4, height: max(4, CGFloat(level) * 80))
+                    .frame(width: 4, height: max(4, CGFloat(level) * 60))
                     .animation(.easeOut(duration: 0.1), value: level)
             }
         }
     }
 
-    // MARK: - Live Transcript
+    // MARK: - Live Transcript List
 
-    private var liveTranscriptArea: some View {
-        ScrollView {
-            Text(viewModel.liveTranscriptText)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
+    private var liveTranscriptList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    // Confirmed segments
+                    ForEach(viewModel.liveSegments) { segment in
+                        LiveSegmentRow(
+                            segment: segment,
+                            isEditing: viewModel.editingSegmentId == segment.id,
+                            editText: $viewModel.editingSegmentText,
+                            isEdited: viewModel.hasPendingEdit(for: segment.id),
+                            onTapEdit: { viewModel.beginSegmentEdit(segment) },
+                            onSave: { viewModel.saveSegmentEdit() },
+                            onCancel: { viewModel.cancelSegmentEdit() }
+                        )
+                        .id(segment.id)
+                    }
+
+                    // Partial text (currently recognizing)
+                    if !viewModel.partialText.isEmpty {
+                        HStack(alignment: .top, spacing: 6) {
+                            Text(viewModel.partialText)
+                                .font(.subheadline.italic())
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            TypingIndicator()
+                        }
+                        .padding(10)
+                        .id("partial")
+                    }
+
+                    // Empty state
+                    if viewModel.liveSegments.isEmpty && viewModel.partialText.isEmpty {
+                        Text(NSLocalizedString("Listening...", comment: ""))
+                            .font(.subheadline)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                            .id("empty")
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: viewModel.liveSegments.count) { _, _ in
+                withAnimation {
+                    if let last = viewModel.liveSegments.last {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: viewModel.partialText) { _, newValue in
+                if !newValue.isEmpty {
+                    withAnimation {
+                        proxy.scrollTo("partial", anchor: .bottom)
+                    }
+                }
+            }
         }
-        .background(Color(.secondarySystemGroupedBackground))
+        .background(Color(.secondarySystemGroupedBackground).opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Chunk Counter
 
     private var chunkCounter: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             Image(systemName: "square.stack.3d.up")
-                .font(.caption)
+                .font(.caption2)
 
-            Text("\(viewModel.chunkCount) chunks")
-                .font(.caption)
+            Text("\(viewModel.chunkCount)")
+                .font(.caption2.monospacedDigit())
         }
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
         .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(Capsule())
     }
@@ -247,7 +260,7 @@ struct RecordingView: View {
                         )
                 }
 
-                Text("Highlight")
+                Text(NSLocalizedString("Highlight", comment: ""))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -268,11 +281,12 @@ struct RecordingView: View {
                         )
                 }
 
-                Text("Stop")
+                Text(NSLocalizedString("Stop", comment: ""))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
         }
+        .frame(height: 100)
     }
 
     // MARK: - Highlight Flash

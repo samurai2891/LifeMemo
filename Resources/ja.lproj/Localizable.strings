@@ -37,6 +37,7 @@
 "Live Transcription" = "リアルタイム文字起こし";
 "Listening..." = "聞き取り中...";
 "Transcription paused" = "文字起こし一時停止中";
+"Tap to edit" = "タップして編集";
 
 /* ===== Playback ===== */
 "Session not found" = "セッションが見つかりません";

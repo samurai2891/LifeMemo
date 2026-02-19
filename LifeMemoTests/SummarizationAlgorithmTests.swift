@@ -16,7 +16,7 @@ final class SummarizationAlgorithmTests: XCTestCase {
     func testDisplayNames() {
         XCTAssertEqual(SummarizationAlgorithm.tfidf.displayName, "TF-IDF")
         XCTAssertEqual(SummarizationAlgorithm.textRank.displayName, "TextRank")
-        XCTAssertEqual(SummarizationAlgorithm.leadBased.displayName, "Lead-Based")
+        XCTAssertEqual(SummarizationAlgorithm.leadBased.displayName, String(localized: "Lead-Based"))
     }
 
     func testDescriptionsAreNotEmpty() {

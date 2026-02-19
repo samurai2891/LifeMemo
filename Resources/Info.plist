@@ -19,11 +19,11 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>LifeMemoは録音に位置情報を記録するために位置情報を使用します。</string>
+	<string>LifeMemo uses location to tag recordings with where they were made.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>LifeMemoは音声メモを録音するためにマイクを使用します。</string>
+	<string>LifeMemo uses the microphone to record voice memos.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>LifeMemoは録音した音声をテキストに変換するために音声認識を使用します。</string>
+	<string>LifeMemo uses speech recognition to transcribe recorded audio to text.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
