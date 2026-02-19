@@ -84,13 +84,13 @@ final class AdvancedSearchService {
     // MARK: - Filter-Only Search
 
     private func filterOnlySearch(filter: SearchFilter, page: Int) -> SearchResults {
-        let sessionIds = fetchFilteredSessionIds(filter: filter)
-
         let request = NSFetchRequest<SessionEntity>(entityName: "SessionEntity")
-        request.predicate = NSPredicate(
-            format: "id IN %@",
-            sessionIds.map { $0 as CVarArg }
-        )
+        let predicates = sessionPredicates(filter: filter)
+        if !predicates.isEmpty {
+            request.predicate = NSCompoundPredicate(
+                andPredicateWithSubpredicates: predicates
+            )
+        }
 
         let sortKey: String
         let ascending: Bool
@@ -113,18 +113,38 @@ final class AdvancedSearchService {
         request.fetchOffset = offset
         request.fetchLimit = pageSize
 
-        return SearchResults(
-            segments: [],
-            sessionIds: Array(sessionIds),
-            totalCount: sessionIds.count,
-            hasMore: offset + pageSize < sessionIds.count
-        )
+        do {
+            let countRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "SessionEntity")
+            if !predicates.isEmpty {
+                countRequest.predicate = NSCompoundPredicate(
+                    andPredicateWithSubpredicates: predicates
+                )
+            }
+            let totalCount = try context.count(for: countRequest)
+
+            let sessions = try context.fetch(request)
+            let pageSessionIds = sessions.compactMap(\.id)
+
+            return SearchResults(
+                segments: [],
+                sessionIds: pageSessionIds,
+                totalCount: totalCount,
+                hasMore: offset + pageSize < totalCount
+            )
+        } catch {
+            print("AdvancedSearchService: filter-only search failed: \(error)")
+            return SearchResults(
+                segments: [],
+                sessionIds: [],
+                totalCount: 0,
+                hasMore: false
+            )
+        }
     }
 
     // MARK: - Filtered Session IDs
 
-    private func fetchFilteredSessionIds(filter: SearchFilter) -> Set<UUID> {
-        let request = NSFetchRequest<NSDictionary>(entityName: "SessionEntity")
+    private func sessionPredicates(filter: SearchFilter) -> [NSPredicate] {
         var predicates: [NSPredicate] = []
 
         if let dateFrom = filter.dateFrom {
@@ -156,6 +176,25 @@ final class AdvancedSearchService {
                 NSNumber(value: hasAudio)
             ))
         }
+        if let tagName = filter.tagName, !tagName.isEmpty {
+            predicates.append(NSPredicate(
+                format: "ANY tags.name == %@",
+                tagName
+            ))
+        }
+        if let folderName = filter.folderName, !folderName.isEmpty {
+            predicates.append(NSPredicate(
+                format: "folder.name == %@",
+                folderName
+            ))
+        }
+
+        return predicates
+    }
+
+    private func fetchFilteredSessionIds(filter: SearchFilter) -> Set<UUID> {
+        let request = NSFetchRequest<NSDictionary>(entityName: "SessionEntity")
+        let predicates = sessionPredicates(filter: filter)
 
         if !predicates.isEmpty {
             request.predicate = NSCompoundPredicate(
