@@ -69,8 +69,9 @@ final class AudioMeterCollector: ObservableObject {
         // We clamp to minDb..-0 and normalize to 0..1
         guard db > minDb else { return 0 }
         guard db < 0 else { return 1 }
-        // Convert dB to linear: pow(10, dB / 20)
-        return pow(10, db / 20)
+        // Perceptual scaling: dB/50 gives visually responsive bars
+        // (dB/20 was too compressed — normal speech barely moved the bars)
+        return pow(10, db / 50)
     }
 
     private func updateRecentLevels() {
