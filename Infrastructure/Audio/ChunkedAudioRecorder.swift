@@ -165,17 +165,29 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
         // Clear immediately to prevent double-finalize from stop()/rotate() race
         currentChunkId = nil
 
-        rec.stop()
-
+        // Capture duration BEFORE stop() — currentTime returns 0 after stop()
+        let duration = rec.currentTime
         let fileURL = rec.url
 
-        // Escalate from recording protection to at-rest protection (P0-03).
-        // The file is fully written; no further writes needed.
-        fileStore.setAtRestProtection(at: fileURL)
+        rec.stop()
+
+        // Allow file I/O to flush on real devices before reading size or
+        // changing protection. Without this, the file may be incomplete.
+        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
 
         let endAt = Date()
-        let duration = rec.currentTime
         let fileSize = Self.fileSize(at: fileURL)
+
+        // Validate the chunk produced a usable file
+        guard fileSize > 0, duration > 0 else {
+            print("ChunkedAudioRecorder: discarding empty chunk \(chunkId) "
+                  + "(size=\(fileSize), duration=\(duration))")
+            return
+        }
+
+        // Escalate from recording protection to at-rest protection (P0-03).
+        // File is now fully flushed to disk.
+        fileStore.setAtRestProtection(at: fileURL)
 
         repository.finalizeChunk(
             chunkId: chunkId,

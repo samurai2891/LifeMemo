@@ -74,6 +74,7 @@ final class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         state = .idle
         currentTimeMs = 0
         currentChunkIndex = 0
+        audioSessionConfigured = false
         stopUpdateTimer()
     }
 
@@ -140,12 +141,17 @@ final class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         startUpdateTimer()
     }
 
+    private var audioSessionConfigured = false
+
     private func preparePlayer(for chunk: ChunkInfo) {
         do {
-            // Configure audio session for playback
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default)
-            try session.setActive(true)
+            // Configure audio session only once to avoid gaps between chunks
+            if !audioSessionConfigured {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(.playback, mode: .default)
+                try session.setActive(true)
+                audioSessionConfigured = true
+            }
 
             let newPlayer = try AVAudioPlayer(contentsOf: chunk.url)
             newPlayer.delegate = self

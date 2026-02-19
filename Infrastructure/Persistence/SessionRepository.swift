@@ -130,6 +130,7 @@ final class SessionRepository {
         segment.text = text
         segment.startMs = max(0, offsetMs)
         segment.endMs = max(0, offsetMs + durationMs)
+        segment.speakerIndex = -1 // Undiarized (single-speaker path)
         segment.createdAt = Date()
         segment.session = session
         segment.chunk = chunk

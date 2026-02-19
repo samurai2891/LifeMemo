@@ -34,6 +34,9 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
     ///   - locale: The locale indicating the expected language of the audio.
     /// - Returns: A `TranscriptionDetail` with formatted text and word segments.
     /// - Throws: `TranscriptionError` if recognition fails.
+    /// Timeout for a single chunk transcription (2 minutes).
+    private static let transcriptionTimeoutNs: UInt64 = 120_000_000_000
+
     func transcribeFileWithSegments(url: URL, locale: Locale) async throws -> TranscriptionDetail {
         guard let recognizer = SFSpeechRecognizer(locale: locale) else {
             throw TranscriptionError.unsupportedLocale
@@ -42,39 +45,61 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
             throw TranscriptionError.onDeviceNotSupported
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
-            let request = SFSpeechURLRecognitionRequest(url: url)
-            request.requiresOnDeviceRecognition = true
-            request.shouldReportPartialResults = false
+        return try await withThrowingTaskGroup(of: TranscriptionDetail.self) { group in
+            // Actual recognition task
+            group.addTask {
+                try await withCheckedThrowingContinuation { continuation in
+                    let request = SFSpeechURLRecognitionRequest(url: url)
+                    request.requiresOnDeviceRecognition = true
+                    request.shouldReportPartialResults = false
 
-            var hasResumed = false
+                    var hasResumed = false
 
-            recognizer.recognitionTask(with: request) { result, error in
-                guard !hasResumed else { return }
+                    recognizer.recognitionTask(with: request) { result, error in
+                        guard !hasResumed else { return }
 
-                if let error = error {
-                    hasResumed = true
-                    continuation.resume(
-                        throwing: TranscriptionError.recognitionFailed(underlying: error)
-                    )
-                    return
-                }
+                        if let error = error {
+                            hasResumed = true
+                            continuation.resume(
+                                throwing: TranscriptionError.recognitionFailed(underlying: error)
+                            )
+                            return
+                        }
 
-                if let result = result, result.isFinal {
-                    hasResumed = true
+                        if let result = result, result.isFinal {
+                            hasResumed = true
 
-                    let transcription = result.bestTranscription
-                    let wordSegments = transcription.segments.map { seg in
-                        Self.mapSegmentToWordInfo(seg)
+                            let transcription = result.bestTranscription
+                            let wordSegments = transcription.segments.map { seg in
+                                Self.mapSegmentToWordInfo(seg)
+                            }
+
+                            let detail = TranscriptionDetail(
+                                formattedString: transcription.formattedString,
+                                wordSegments: wordSegments
+                            )
+                            continuation.resume(returning: detail)
+                        }
                     }
-
-                    let detail = TranscriptionDetail(
-                        formattedString: transcription.formattedString,
-                        wordSegments: wordSegments
-                    )
-                    continuation.resume(returning: detail)
                 }
             }
+
+            // Timeout task
+            group.addTask {
+                try await Task.sleep(nanoseconds: Self.transcriptionTimeoutNs)
+                throw TranscriptionError.recognitionFailed(
+                    underlying: NSError(
+                        domain: "OnDeviceTranscriber",
+                        code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Transcription timed out"]
+                    )
+                )
+            }
+
+            // Return whichever finishes first; cancel the other
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
         }
     }
 
