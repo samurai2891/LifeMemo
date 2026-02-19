@@ -139,13 +139,18 @@ final class AppContainer: ObservableObject {
         let locationService = LocationService()
         self.locationService = locationService
 
+        // v1.0: STT (initialized before RecordingCoordinator which depends on it)
+        let liveTranscriber = LiveTranscriber()
+
         self.recordingCoordinator = RecordingCoordinator(
             repository: repository,
             audioSession: audioSession,
             chunkRecorder: chunkRecorder,
             interruptionHandler: audioInterruptionHandler,
             healthMonitor: recordingHealthMonitor,
-            locationService: locationService
+            locationService: locationService,
+            transcriptionQueue: transcriptionQueue,
+            liveTranscriber: liveTranscriber
         )
 
         // v1.0: Summarization
@@ -196,7 +201,7 @@ final class AppContainer: ObservableObject {
 
         // v1.0: STT
         self.transcriptionCapabilityChecker = TranscriptionCapabilityChecker()
-        self.liveTranscriber = LiveTranscriber()
+        self.liveTranscriber = liveTranscriber
 
         // v1.0: Security
         self.appLockManager = AppLockManager()

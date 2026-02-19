@@ -24,7 +24,8 @@ struct RecordingView: View {
             wrappedValue: RecordingViewModel(
                 coordinator: container.recordingCoordinator,
                 repository: container.repository,
-                meterCollector: container.chunkRecorder.meterCollector
+                meterCollector: container.chunkRecorder.meterCollector,
+                liveTranscriber: container.liveTranscriber
             )
         )
     }

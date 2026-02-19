@@ -19,7 +19,9 @@ final class RecordingViewModel: ObservableObject {
     private let coordinator: RecordingCoordinator
     private let repository: SessionRepository
     private weak var meterCollector: AudioMeterCollector?
+    private let liveTranscriber: LiveTranscriber
     private var meterCancellable: AnyCancellable?
+    private var transcriptCancellable: AnyCancellable?
     private var waveformTimer: Timer?
 
     // MARK: - Computed
@@ -35,10 +37,16 @@ final class RecordingViewModel: ObservableObject {
 
     // MARK: - Init
 
-    init(coordinator: RecordingCoordinator, repository: SessionRepository, meterCollector: AudioMeterCollector?) {
+    init(
+        coordinator: RecordingCoordinator,
+        repository: SessionRepository,
+        meterCollector: AudioMeterCollector?,
+        liveTranscriber: LiveTranscriber
+    ) {
         self.coordinator = coordinator
         self.repository = repository
         self.meterCollector = meterCollector
+        self.liveTranscriber = liveTranscriber
     }
 
     // MARK: - Actions
@@ -65,11 +73,21 @@ final class RecordingViewModel: ObservableObject {
                     self?.waveformLevels = levels
                 }
         }
+
+        // Subscribe to live transcription text
+        transcriptCancellable = liveTranscriber.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.liveTranscriptText = self.liveTranscriber.fullText
+            }
     }
 
     func stopWaveformAnimation() {
         meterCancellable?.cancel()
         meterCancellable = nil
+        transcriptCancellable?.cancel()
+        transcriptCancellable = nil
         waveformTimer?.invalidate()
         waveformTimer = nil
         waveformLevels = Array(repeating: 0.1, count: 30)

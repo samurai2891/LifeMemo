@@ -22,6 +22,8 @@ final class RecordingCoordinator: ObservableObject {
     private let interruptionHandler: AudioInterruptionHandler
     private let healthMonitor: RecordingHealthMonitor
     private let locationService: LocationService
+    private let transcriptionQueue: TranscriptionQueueActor
+    private let liveTranscriber: LiveTranscriber
 
     // MARK: - Callbacks
 
@@ -40,7 +42,9 @@ final class RecordingCoordinator: ObservableObject {
         chunkRecorder: ChunkedAudioRecorder,
         interruptionHandler: AudioInterruptionHandler,
         healthMonitor: RecordingHealthMonitor,
-        locationService: LocationService
+        locationService: LocationService,
+        transcriptionQueue: TranscriptionQueueActor,
+        liveTranscriber: LiveTranscriber
     ) {
         self.repository = repository
         self.audioSession = audioSession
@@ -48,6 +52,8 @@ final class RecordingCoordinator: ObservableObject {
         self.interruptionHandler = interruptionHandler
         self.healthMonitor = healthMonitor
         self.locationService = locationService
+        self.transcriptionQueue = transcriptionQueue
+        self.liveTranscriber = liveTranscriber
 
         setupInterruptionHandling()
     }
@@ -74,6 +80,12 @@ final class RecordingCoordinator: ObservableObject {
             self.state = .recording(sessionId: sessionId)
             startElapsedTimer()
             healthMonitor.startMonitoring(sessionStart: Date())
+
+            // Defer chunk transcription while recording is active
+            Task { await transcriptionQueue.setRecordingActive(true) }
+
+            // Start live transcription preview
+            liveTranscriber.start(locale: languageMode.locale)
         } catch {
             audioSession.deactivate()
             let errorMessage = "Failed to start recording: \(error.localizedDescription)"
@@ -95,6 +107,9 @@ final class RecordingCoordinator: ObservableObject {
             locationService.captureCurrentLocation()
         }
 
+        // Stop live transcription preview
+        liveTranscriber.stop()
+
         Task {
             await chunkRecorder.stop()
             repository.updateSessionEnded(
@@ -112,6 +127,10 @@ final class RecordingCoordinator: ObservableObject {
             }
             locationService.reset()
             audioSession.deactivate()
+
+            // Flush transcription queue now that all chunks are finalized
+            await transcriptionQueue.setRecordingActive(false)
+
             state = .idle
             elapsedSeconds = 0
         }
