@@ -453,3 +453,7 @@
 "Sort Order" = "並び順";
 "Search Filters" = "検索フィルター";
 "Apply" = "適用";
+
+/* ===== Speaker Diarization ===== */
+"Speaker Participation" = "スピーカー発言量";
+"Include Speaker Labels" = "スピーカーラベルを含める";

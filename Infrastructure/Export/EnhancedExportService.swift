@@ -118,9 +118,17 @@ enum FilteredMarkdownExporter {
             md += "\n"
         }
 
-        if options.includeTranscript, !model.fullTranscript.isEmpty {
+        if options.includeTranscript {
             md += "## Transcript\n\n"
-            md += model.fullTranscript + "\n"
+            if model.hasSpeakerSegments {
+                for segment in model.speakerSegments {
+                    let name = segment.speakerName ?? "Speaker \(segment.speakerIndex + 1)"
+                    let timestamp = formatTimestamp(ms: segment.startMs)
+                    md += "**\(name)** [\(timestamp)]: \(segment.text)\n\n"
+                }
+            } else if !model.fullTranscript.isEmpty {
+                md += model.fullTranscript + "\n"
+            }
         }
 
         return md
@@ -189,9 +197,17 @@ enum FilteredTextExporter {
             lines.append("")
         }
 
-        if options.includeTranscript, !model.fullTranscript.isEmpty {
+        if options.includeTranscript {
             lines.append("--- Transcript ---")
-            lines.append(model.fullTranscript)
+            if model.hasSpeakerSegments {
+                for segment in model.speakerSegments {
+                    let name = segment.speakerName ?? "Speaker \(segment.speakerIndex + 1)"
+                    let timestamp = FilteredTextExporter.formatTimestamp(ms: segment.startMs)
+                    lines.append("[\(name)] [\(timestamp)] \(segment.text)")
+                }
+            } else if !model.fullTranscript.isEmpty {
+                lines.append(model.fullTranscript)
+            }
         }
 
         return lines.joined(separator: "\n")

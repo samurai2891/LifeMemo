@@ -167,7 +167,7 @@ enum PDFExporter {
         options: ExportOptions,
         renderer: inout PDFPageRenderer
     ) {
-        guard options.includeTranscript, !model.fullTranscript.isEmpty else { return }
+        guard options.includeTranscript else { return }
 
         renderer.drawText(
             "Transcript",
@@ -176,15 +176,65 @@ enum PDFExporter {
         )
         renderer.advance(8)
 
-        let paragraphs = model.fullTranscript.components(separatedBy: "\n")
-        for paragraph in paragraphs {
-            guard !paragraph.trimmingCharacters(in: .whitespaces).isEmpty else {
-                renderer.advance(6)
-                continue
+        if model.hasSpeakerSegments {
+            renderSpeakerSegments(model: model, renderer: &renderer)
+        } else {
+            guard !model.fullTranscript.isEmpty else { return }
+            let paragraphs = model.fullTranscript.components(separatedBy: "\n")
+            for paragraph in paragraphs {
+                guard !paragraph.trimmingCharacters(in: .whitespaces).isEmpty else {
+                    renderer.advance(6)
+                    continue
+                }
+                renderer.drawText(paragraph, font: .systemFont(ofSize: 11), color: .black)
+                renderer.advance(2)
             }
-            renderer.drawText(paragraph, font: .systemFont(ofSize: 11), color: .black)
-            renderer.advance(2)
         }
+    }
+
+    private static func renderSpeakerSegments(
+        model: ExportModel,
+        renderer: inout PDFPageRenderer
+    ) {
+        for segment in model.speakerSegments {
+            let name = segment.speakerName ?? "Speaker \(segment.speakerIndex + 1)"
+            let timestamp = formatTimestamp(ms: segment.startMs)
+            let color = speakerColor(for: segment.speakerIndex)
+
+            renderer.drawText(
+                "\(name) [\(timestamp)]",
+                font: .systemFont(ofSize: 11, weight: .bold),
+                color: color
+            )
+            renderer.drawText(
+                segment.text,
+                font: .systemFont(ofSize: 11),
+                color: .black
+            )
+            renderer.advance(6)
+        }
+    }
+
+    private static func formatTimestamp(ms: Int64) -> String {
+        let sec = ms / 1000
+        let min = sec / 60
+        let remSec = sec % 60
+        return String(format: "%02d:%02d", min, remSec)
+    }
+
+    /// Returns a distinct UIColor for each speaker index (up to 8 speakers).
+    private static func speakerColor(for index: Int) -> UIColor {
+        let colors: [UIColor] = [
+            UIColor(red: 0.20, green: 0.40, blue: 0.80, alpha: 1.0),  // Blue
+            UIColor(red: 0.80, green: 0.25, blue: 0.25, alpha: 1.0),  // Red
+            UIColor(red: 0.15, green: 0.60, blue: 0.35, alpha: 1.0),  // Green
+            UIColor(red: 0.65, green: 0.35, blue: 0.75, alpha: 1.0),  // Purple
+            UIColor(red: 0.85, green: 0.55, blue: 0.15, alpha: 1.0),  // Orange
+            UIColor(red: 0.20, green: 0.60, blue: 0.60, alpha: 1.0),  // Teal
+            UIColor(red: 0.70, green: 0.45, blue: 0.25, alpha: 1.0),  // Brown
+            UIColor(red: 0.50, green: 0.50, blue: 0.50, alpha: 1.0),  // Gray
+        ]
+        return colors[index % colors.count]
     }
 
     // MARK: - Helpers

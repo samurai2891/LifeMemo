@@ -18,6 +18,7 @@ public class SessionEntity: NSManagedObject {
     @NSManaged public var placeName: String?
     @NSManaged public var speakerNamesJSON: String?  // e.g. {"0":"Taro","1":"Hanako"}
     @NSManaged public var liveEditsJSON: String?
+    @NSManaged public var speakerProfilesJSON: String?
     @NSManaged public var chunks: NSSet?
     @NSManaged public var segments: NSSet?
     @NSManaged public var highlights: NSSet?
@@ -81,6 +82,21 @@ extension SessionEntity {
             }
         }
         return result
+    }
+
+    /// Decoded speaker profiles per chunk (chunkIndex -> profiles).
+    var speakerProfiles: [Int: [SpeakerProfile]] {
+        guard let json = speakerProfilesJSON,
+              let data = json.data(using: .utf8) else { return [:] }
+        return (try? JSONDecoder().decode([Int: [SpeakerProfile]].self, from: data)) ?? [:]
+    }
+
+    /// Encodes and stores the speaker profiles mapping.
+    func setSpeakerProfiles(_ profiles: [Int: [SpeakerProfile]]) {
+        if let data = try? JSONEncoder().encode(profiles),
+           let json = String(data: data, encoding: .utf8) {
+            speakerProfilesJSON = json
+        }
     }
 
     /// Encodes and stores the speaker name mapping.

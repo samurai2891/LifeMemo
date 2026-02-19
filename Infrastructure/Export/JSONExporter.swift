@@ -22,11 +22,20 @@ enum JSONExporter {
         let locationName: String?
         let transcript: String
         let highlights: [HighlightExport]
+        let segments: [SpeakerSegmentExport]?
     }
 
     struct HighlightExport: Codable {
         let atMs: Int64
         let label: String?
+    }
+
+    struct SpeakerSegmentExport: Codable {
+        let speakerIndex: Int
+        let speakerName: String?
+        let text: String
+        let startMs: Int64
+        let endMs: Int64
     }
 
     static func make(model: ExportModel, options: ExportOptions) -> String {
@@ -35,6 +44,21 @@ enum JSONExporter {
         let highlights = options.includeHighlights
             ? model.highlights.map { HighlightExport(atMs: $0.atMs, label: $0.label) }
             : []
+
+        let speakerSegments: [SpeakerSegmentExport]?
+        if model.hasSpeakerSegments && options.includeTranscript {
+            speakerSegments = model.speakerSegments.map { seg in
+                SpeakerSegmentExport(
+                    speakerIndex: seg.speakerIndex,
+                    speakerName: seg.speakerName,
+                    text: seg.text,
+                    startMs: seg.startMs,
+                    endMs: seg.endMs
+                )
+            }
+        } else {
+            speakerSegments = nil
+        }
 
         let session = SessionExport(
             title: model.title,
@@ -48,7 +72,8 @@ enum JSONExporter {
             folderName: model.folderName,
             locationName: model.locationName,
             transcript: options.includeTranscript ? model.fullTranscript : "",
-            highlights: highlights
+            highlights: highlights,
+            segments: speakerSegments
         )
 
         let envelope = ExportEnvelope(

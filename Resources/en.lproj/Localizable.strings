@@ -454,3 +454,7 @@
 "Sort Order" = "Sort Order";
 "Search Filters" = "Search Filters";
 "Apply" = "Apply";
+
+/* ===== Speaker Diarization ===== */
+"Speaker Participation" = "Speaker Participation";
+"Include Speaker Labels" = "Include Speaker Labels";

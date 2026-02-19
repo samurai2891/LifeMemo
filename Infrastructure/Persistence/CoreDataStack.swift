@@ -215,12 +215,18 @@ final class CoreDataStack {
         liveEditsJSON.attributeType = .stringAttributeType
         liveEditsJSON.isOptional = true
 
+        let speakerProfilesJSON = NSAttributeDescription()
+        speakerProfilesJSON.name = "speakerProfilesJSON"
+        speakerProfilesJSON.attributeType = .stringAttributeType
+        speakerProfilesJSON.isOptional = true
+
         entity.properties = [
             id, createdAt, startedAt, endedAt,
             title, languageModeRaw, statusRaw,
             audioKept, summary, bodyText,
             latitude, longitude, placeName,
-            speakerNamesJSON, liveEditsJSON
+            speakerNamesJSON, liveEditsJSON,
+            speakerProfilesJSON
         ]
         return entity
     }

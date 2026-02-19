@@ -114,14 +114,19 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
     private static func mapSegmentToWordInfo(
         _ seg: SFTranscriptionSegment
     ) -> WordSegmentInfo {
-        let avgPitch = extractAveragePitch(from: seg)
+        let analytics = seg.voiceAnalytics
 
         return WordSegmentInfo(
             substring: seg.substring,
             timestamp: seg.timestamp,
             duration: seg.duration,
             confidence: seg.confidence,
-            averagePitch: avgPitch
+            averagePitch: extractAveragePitch(from: seg),
+            pitchStdDev: extractStdDev(from: analytics?.pitch),
+            averageEnergy: nil,           // Not available in voiceAnalytics; AudioFeatureExtractor fills this
+            averageSpectralCentroid: nil,  // Same — filled by AudioFeatureExtractor
+            averageJitter: extractAverage(from: analytics?.jitter),
+            averageShimmer: extractAverage(from: analytics?.shimmer)
         )
     }
 
@@ -138,5 +143,29 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
         // Filter out clearly invalid values
         guard avg > 0, avg.isFinite else { return nil }
         return avg
+    }
+
+    /// Extracts the mean value from an `SFAcousticFeature`.
+    private static func extractAverage(from feature: SFAcousticFeature?) -> Float? {
+        guard let feature = feature else { return nil }
+        let values = feature.acousticFeatureValuePerFrame
+        guard !values.isEmpty else { return nil }
+        let sum = values.reduce(0.0) { $0 + Double($1) }
+        let avg = Float(sum / Double(values.count))
+        guard avg.isFinite else { return nil }
+        return avg
+    }
+
+    /// Extracts the standard deviation from an `SFAcousticFeature`.
+    private static func extractStdDev(from feature: SFAcousticFeature?) -> Float? {
+        guard let feature = feature else { return nil }
+        let values = feature.acousticFeatureValuePerFrame
+        guard values.count > 1 else { return nil }
+        let sum = values.reduce(0.0) { $0 + Double($1) }
+        let mean = sum / Double(values.count)
+        let variance = values.reduce(0.0) { $0 + pow(Double($1) - mean, 2) } / Double(values.count)
+        let stdDev = Float(sqrt(variance))
+        guard stdDev.isFinite else { return nil }
+        return stdDev
     }
 }

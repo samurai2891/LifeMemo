@@ -29,14 +29,20 @@ final class SimpleSummarizer: SummarizerProtocol {
     // MARK: - SummarizerProtocol
 
     func buildSummaryMarkdown(sessionId: UUID, algorithm: SummarizationAlgorithm) -> String {
-        let fullText = repository.getFullTranscriptText(sessionId: sessionId)
+        // Use speaker-attributed text if available for better summarization
+        let speakerText = repository.getSpeakerAttributedTranscript(sessionId: sessionId)
+        let fullText = speakerText.isEmpty
+            ? repository.getFullTranscriptText(sessionId: sessionId)
+            : speakerText
         guard !fullText.isEmpty else {
             return "# Summary\n\nNo transcript available yet."
         }
 
         let highlights = repository.getHighlights(sessionId: sessionId)
-        let result = summarize(text: fullText, algorithm: algorithm)
-        let topics = topicExtractor.extract(from: fullText)
+        // Summarize using raw text (without speaker labels) for cleaner extraction
+        let rawText = repository.getFullTranscriptText(sessionId: sessionId)
+        let result = summarize(text: rawText.isEmpty ? fullText : rawText, algorithm: algorithm)
+        let topics = topicExtractor.extract(from: rawText.isEmpty ? fullText : rawText)
 
         var md = "# Summary\n\n"
 
@@ -87,7 +93,57 @@ final class SimpleSummarizer: SummarizerProtocol {
             md += "\n"
         }
 
+        // Speaker Participation
+        let speakerStats = computeSpeakerParticipation(sessionId: sessionId)
+        if !speakerStats.isEmpty {
+            md += "\n## Speaker Participation\n"
+            for stat in speakerStats {
+                md += "- **\(stat.name)**: \(stat.wordCount) words (\(stat.percentage)%)\n"
+            }
+            md += "\n"
+        }
+
         return md
+    }
+
+    // MARK: - Speaker Statistics
+
+    private struct SpeakerStat {
+        let name: String
+        let wordCount: Int
+        let percentage: Int
+    }
+
+    private func computeSpeakerParticipation(sessionId: UUID) -> [SpeakerStat] {
+        let segments = repository.getSpeakerSegments(sessionId: sessionId)
+        guard !segments.isEmpty else { return [] }
+
+        // Check for actual diarization (not all -1)
+        let hasDiarization = segments.contains { $0.speakerIndex >= 0 }
+        guard hasDiarization else { return [] }
+
+        // Count words per speaker
+        var wordCounts: [Int: Int] = [:]
+        var speakerNames: [Int: String] = [:]
+
+        for segment in segments where segment.speakerIndex >= 0 {
+            let words = segment.text.split(separator: " ").count
+            wordCounts[segment.speakerIndex, default: 0] += words
+            if let name = segment.speakerName {
+                speakerNames[segment.speakerIndex] = name
+            }
+        }
+
+        let totalWords = wordCounts.values.reduce(0, +)
+        guard totalWords > 0 else { return [] }
+
+        return wordCounts
+            .sorted { $0.key < $1.key }
+            .map { idx, count in
+                let name = speakerNames[idx] ?? "Speaker \(idx + 1)"
+                let pct = Int(round(Double(count) / Double(totalWords) * 100))
+                return SpeakerStat(name: name, wordCount: count, percentage: pct)
+            }
     }
 
     // MARK: - Algorithm Dispatch

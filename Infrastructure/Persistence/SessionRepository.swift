@@ -201,6 +201,71 @@ final class SessionRepository {
         return session.languageMode.locale
     }
 
+    // MARK: - Speaker Profiles
+
+    /// Saves speaker profiles for a specific chunk, merging with any existing profiles.
+    func saveSpeakerProfiles(sessionId: UUID, chunkIndex: Int, profiles: [SpeakerProfile]) {
+        guard let session = fetchSession(id: sessionId) else { return }
+        var allProfiles = session.speakerProfiles
+        allProfiles[chunkIndex] = profiles
+        session.setSpeakerProfiles(allProfiles)
+        saveOrLog()
+    }
+
+    /// Returns the chunk index for a given chunk ID.
+    func getChunkIndex(chunkId: UUID) -> Int {
+        guard let chunk = fetchChunk(id: chunkId) else { return 0 }
+        return Int(chunk.index)
+    }
+
+    /// Returns speaker-attributed segments for export purposes.
+    func getSpeakerSegments(sessionId: UUID) -> [ExportSegment] {
+        guard let session = fetchSession(id: sessionId) else { return [] }
+        let speakerNames = session.speakerNames
+
+        return session.segmentsArray.compactMap { segment in
+            let speakerIdx = Int(segment.speakerIndex)
+            guard let text = segment.text, !text.isEmpty else { return nil }
+
+            let speakerName: String?
+            if speakerIdx >= 0 {
+                speakerName = speakerNames[speakerIdx]
+            } else {
+                speakerName = nil
+            }
+
+            return ExportSegment(
+                speakerIndex: speakerIdx,
+                speakerName: speakerName,
+                text: text,
+                startMs: segment.startMs,
+                endMs: segment.endMs
+            )
+        }
+    }
+
+    /// Returns transcript text with speaker attribution for summarization.
+    func getSpeakerAttributedTranscript(sessionId: UUID) -> String {
+        guard let session = fetchSession(id: sessionId) else { return "" }
+        let speakerNames = session.speakerNames
+        let segments = session.segmentsArray
+
+        // Check if there are multiple speakers
+        let speakerIndices = Set(segments.map { Int($0.speakerIndex) })
+        let hasDiarization = speakerIndices.count > 1 || speakerIndices.first != -1
+
+        if !hasDiarization {
+            return segments.compactMap { $0.text }.filter { !$0.isEmpty }.joined(separator: "\n")
+        }
+
+        return segments.compactMap { segment -> String? in
+            guard let text = segment.text, !text.isEmpty else { return nil }
+            let idx = Int(segment.speakerIndex)
+            let name = speakerNames[idx] ?? "Speaker \(idx + 1)"
+            return "[\(name)] \(text)"
+        }.joined(separator: "\n")
+    }
+
     // MARK: - Retranscription
 
     /// Deletes all transcript segments (and their edit history) for a given chunk.
@@ -272,6 +337,34 @@ final class SessionRepository {
         saveOrLog()
     }
 
+    /// Aligns speaker indices across all chunks using `CrossChunkSpeakerAligner`.
+    /// Called once when all chunks have finished transcription. Does not save — caller is responsible.
+    private func alignSpeakersAcrossChunks(session: SessionEntity) {
+        let profilesByChunk = session.speakerProfiles
+        guard profilesByChunk.count > 1 else { return }
+
+        let chunkSpeakers = profilesByChunk
+            .sorted { $0.key < $1.key }
+            .map { CrossChunkSpeakerAligner.ChunkSpeakers(chunkIndex: $0.key, profiles: $0.value) }
+
+        let (alignmentMap, _) = CrossChunkSpeakerAligner.align(chunkSpeakers: chunkSpeakers)
+
+        // Apply alignment to transcript segments
+        let chunks = session.chunksArray
+        for chunk in chunks {
+            let chunkIndex = Int(chunk.index)
+            guard let localToGlobal = alignmentMap[chunkIndex] else { continue }
+            guard let segments = chunk.segments as? Set<TranscriptSegmentEntity> else { continue }
+
+            for segment in segments {
+                let localIdx = Int(segment.speakerIndex)
+                if let globalIdx = localToGlobal[localIdx] {
+                    segment.speakerIndex = Int16(globalIdx)
+                }
+            }
+        }
+    }
+
     /// Reconciles live edits with final transcription segments, applying matched
     /// edits and clearing the JSON afterwards. Does not save — caller is responsible.
     private func applyLiveEdits(for session: SessionEntity) {
@@ -322,6 +415,7 @@ final class SessionRepository {
         }
 
         if allFinished {
+            alignSpeakersAcrossChunks(session: session)
             applyLiveEdits(for: session)
             session.status = .ready
             saveOrLog()
@@ -721,13 +815,18 @@ final class SessionRepository {
             let segments = try context.fetch(request)
             return segments.compactMap { segment -> SearchResult? in
                 guard let session = segment.session else { return nil }
+                let speakerIdx = Int(segment.speakerIndex)
+                let speakerName: String? = speakerIdx >= 0
+                    ? (session.speakerNames[speakerIdx] ?? "Speaker \(speakerIdx + 1)")
+                    : nil
                 return SearchResult(
                     id: segment.id ?? UUID(),
                     sessionId: session.id ?? UUID(),
                     segmentText: segment.text ?? "",
                     startMs: segment.startMs,
                     endMs: segment.endMs,
-                    sessionTitle: session.title ?? ""
+                    sessionTitle: session.title ?? "",
+                    speakerName: speakerName
                 )
             }
         } catch {
@@ -758,6 +857,7 @@ final class SessionRepository {
 
         let transcript = getFullTranscriptText(sessionId: sessionId)
         let highlights = session.highlightsArray.map { $0.toInfo() }
+        let speakerSegments = getSpeakerSegments(sessionId: sessionId)
 
         return ExportModel(
             title: session.title ?? "",
@@ -771,7 +871,8 @@ final class SessionRepository {
             bodyText: session.bodyText,
             tags: session.tagsArray.map { $0.name ?? "" },
             folderName: session.folder?.name,
-            locationName: session.placeName
+            locationName: session.placeName,
+            speakerSegments: speakerSegments
         )
     }
 

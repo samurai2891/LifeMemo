@@ -43,8 +43,24 @@ enum TextExporter {
         }
 
         lines.append("--- Transcript ---")
-        lines.append(model.fullTranscript)
+
+        if model.hasSpeakerSegments {
+            for segment in model.speakerSegments {
+                let name = segment.speakerName ?? "Speaker \(segment.speakerIndex + 1)"
+                let timestamp = formatTimestamp(ms: segment.startMs)
+                lines.append("[\(name)] [\(timestamp)] \(segment.text)")
+            }
+        } else {
+            lines.append(model.fullTranscript)
+        }
 
         return lines.joined(separator: "\n")
+    }
+
+    private static func formatTimestamp(ms: Int64) -> String {
+        let sec = ms / 1000
+        let min = sec / 60
+        let remSec = sec % 60
+        return String(format: "%02d:%02d", min, remSec)
     }
 }

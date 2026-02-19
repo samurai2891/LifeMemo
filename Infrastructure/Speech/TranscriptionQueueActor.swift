@@ -152,6 +152,15 @@ actor TranscriptionQueueActor {
                         diarization: diarization,
                         fullText: detail.formattedString
                     )
+                    // Save speaker profiles for cross-chunk alignment
+                    if !diarization.speakerProfiles.isEmpty {
+                        let chunkIndex = repository.getChunkIndex(chunkId: chunkId)
+                        repository.saveSpeakerProfiles(
+                            sessionId: sessionId,
+                            chunkIndex: chunkIndex,
+                            profiles: diarization.speakerProfiles
+                        )
+                    }
                 } else {
                     // Single speaker or no diarization → use original path
                     repository.saveTranscript(

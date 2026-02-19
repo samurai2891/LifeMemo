@@ -32,9 +32,25 @@ enum MarkdownExporter {
         }
 
         md += "## Transcript\n\n"
-        md += model.fullTranscript
-        md += "\n"
+
+        if model.hasSpeakerSegments {
+            for segment in model.speakerSegments {
+                let name = segment.speakerName ?? "Speaker \(segment.speakerIndex + 1)"
+                let timestamp = formatTimestamp(ms: segment.startMs)
+                md += "**\(name)** [\(timestamp)]: \(segment.text)\n\n"
+            }
+        } else {
+            md += model.fullTranscript
+            md += "\n"
+        }
 
         return md
+    }
+
+    private static func formatTimestamp(ms: Int64) -> String {
+        let sec = ms / 1000
+        let min = sec / 60
+        let remSec = sec % 60
+        return String(format: "%02d:%02d", min, remSec)
     }
 }
