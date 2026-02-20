@@ -1,0 +1,5 @@
+/* InfoPlist.strings (English) - LifeMemo */
+
+"NSMicrophoneUsageDescription" = "LifeMemo uses the microphone to record voice memos.";
+"NSSpeechRecognitionUsageDescription" = "LifeMemo uses speech recognition to transcribe recorded audio to text.";
+"NSLocationWhenInUseUsageDescription" = "LifeMemo uses location to tag recordings with where they were made.";

@@ -1,0 +1,480 @@
+"Issue Type","Issue ID","Summary","Parent","Priority","Epic Name","Owner Role","Labels","Labels","Labels","Labels","Labels","Components","Description"
+"Epic","100","EPIC-PRIVACY: On-device Privacy & Data Governance","","Medium","EPIC-PRIVACY","PM + iOS TL","lifememo","v1","ondevice","epic","","Privacy","Owner (Role): PM (product) + iOS Tech Lead
+
+Goal:
+- Group related tickets under this epic.
+- Define v1 scope and quality bar for this area.
+
+Acceptance Criteria:
+- Epic exists and can be used as a Parent for child work items during CSV import.
+
+Test Steps (Manual):
+1. Import this Epic and confirm it appears in Jira as an Epic work item.
+
+Notes:
+- Jira Cloud CSV hierarchy linking is handled via 'Parent' field with Issue IDs; keep Epics at top of the CSV."
+"Epic","110","EPIC-AUDIO: Recording & Metering (Background Recording)","","Medium","EPIC-AUDIO","PM + iOS TL","lifememo","v1","ondevice","epic","","Audio","Owner (Role): PM (product) + iOS Tech Lead
+
+Goal:
+- Group related tickets under this epic.
+- Define v1 scope and quality bar for this area.
+
+Acceptance Criteria:
+- Epic exists and can be used as a Parent for child work items during CSV import.
+
+Test Steps (Manual):
+1. Import this Epic and confirm it appears in Jira as an Epic work item.
+
+Notes:
+- Jira Cloud CSV hierarchy linking is handled via 'Parent' field with Issue IDs; keep Epics at top of the CSV."
+"Epic","120","EPIC-STT: On-device Speech-to-Text (ja_JP / en_US)","","Medium","EPIC-STT","PM + iOS TL","lifememo","v1","ondevice","epic","","Speech","Owner (Role): PM (product) + iOS Tech Lead
+
+Goal:
+- Group related tickets under this epic.
+- Define v1 scope and quality bar for this area.
+
+Acceptance Criteria:
+- Epic exists and can be used as a Parent for child work items during CSV import.
+
+Test Steps (Manual):
+1. Import this Epic and confirm it appears in Jira as an Epic work item.
+
+Notes:
+- Jira Cloud CSV hierarchy linking is handled via 'Parent' field with Issue IDs; keep Epics at top of the CSV."
+"Epic","130","EPIC-SEC: App Lock & Exposure Control","","Medium","EPIC-SEC","PM + iOS TL","lifememo","v1","ondevice","epic","","Security","Owner (Role): PM (product) + iOS Tech Lead
+
+Goal:
+- Group related tickets under this epic.
+- Define v1 scope and quality bar for this area.
+
+Acceptance Criteria:
+- Epic exists and can be used as a Parent for child work items during CSV import.
+
+Test Steps (Manual):
+1. Import this Epic and confirm it appears in Jira as an Epic work item.
+
+Notes:
+- Jira Cloud CSV hierarchy linking is handled via 'Parent' field with Issue IDs; keep Epics at top of the CSV."
+"Epic","140","EPIC-EXPORT: Encrypted Export / Full Backup / Restore","","Medium","EPIC-EXPORT","PM + iOS TL","lifememo","v1","ondevice","epic","","Export","Owner (Role): PM (product) + iOS Tech Lead
+
+Goal:
+- Group related tickets under this epic.
+- Define v1 scope and quality bar for this area.
+
+Acceptance Criteria:
+- Epic exists and can be used as a Parent for child work items during CSV import.
+
+Test Steps (Manual):
+1. Import this Epic and confirm it appears in Jira as an Epic work item.
+
+Notes:
+- Jira Cloud CSV hierarchy linking is handled via 'Parent' field with Issue IDs; keep Epics at top of the CSV."
+"Epic","150","EPIC-STORAGE: Storage Management (Limits / Auto-delete)","","Medium","EPIC-STORAGE","PM + iOS TL","lifememo","v1","ondevice","epic","","Storage","Owner (Role): PM (product) + iOS Tech Lead
+
+Goal:
+- Group related tickets under this epic.
+- Define v1 scope and quality bar for this area.
+
+Acceptance Criteria:
+- Epic exists and can be used as a Parent for child work items during CSV import.
+
+Test Steps (Manual):
+1. Import this Epic and confirm it appears in Jira as an Epic work item.
+
+Notes:
+- Jira Cloud CSV hierarchy linking is handled via 'Parent' field with Issue IDs; keep Epics at top of the CSV."
+"Epic","160","EPIC-SUPPORT: Diagnostics (Local log export)","","Medium","EPIC-SUPPORT","PM + iOS TL","lifememo","v1","ondevice","epic","","Diagnostics","Owner (Role): PM (product) + iOS Tech Lead
+
+Goal:
+- Group related tickets under this epic.
+- Define v1 scope and quality bar for this area.
+
+Acceptance Criteria:
+- Epic exists and can be used as a Parent for child work items during CSV import.
+
+Test Steps (Manual):
+1. Import this Epic and confirm it appears in Jira as an Epic work item.
+
+Notes:
+- Jira Cloud CSV hierarchy linking is handled via 'Parent' field with Issue IDs; keep Epics at top of the CSV."
+"Epic","170","EPIC-ENHANCE: Enhancements (P2 backlog)","","Medium","EPIC-ENHANCE","PM + iOS TL","lifememo","v1","ondevice","epic","","Enhancements","Owner (Role): PM (product) + iOS Tech Lead
+
+Goal:
+- Group related tickets under this epic.
+- Define v1 scope and quality bar for this area.
+
+Acceptance Criteria:
+- Epic exists and can be used as a Parent for child work items during CSV import.
+
+Test Steps (Manual):
+1. Import this Epic and confirm it appears in Jira as an Epic work item.
+
+Notes:
+- Jira Cloud CSV hierarchy linking is handled via 'Parent' field with Issue IDs; keep Epics at top of the CSV."
+"Story","1001","[P0-01] 自動の外部送信ゼロ（iCloud同期/自動送信の封じ込め）","100","Highest","","iOS Engineer (Core/Privacy)","lifememo","v1","ondevice","p0","privacy","Privacy","Owner (Role): iOS Engineer (Core/Privacy)
+
+Goal:
+- Ensure the app does not automatically transmit user data externally.
+- v1: iCloud is used only as a manual destination for encrypted backup files (via Files). No auto sync.
+
+Acceptance Criteria:
+- No app-initiated network traffic occurs during normal usage flows (record, browse, transcribe, search, settings).
+- No CloudKit/auto-sync code paths or UI that imply automatic sync are present.
+- Only user-initiated export/backup actions can result in external storage (e.g., user saves backup to iCloud Drive).
+
+Test Steps (Manual):
+1. Run with a network proxy (e.g., Proxyman/Charles). Perform: record → stop → browse → open note → run transcription (on-device) → export. Verify no network requests appear.
+2. Verify that saving an encrypted backup to iCloud Drive is only possible via explicit user action (Files picker).
+3. Static scan: confirm no analytics/ads/crash auto-upload SDKs are enabled for production.
+
+Suggested Automation:
+- Add a debug NetworkGuard wrapper to assert/log if unexpected URLSession/NW calls happen.
+
+Notes:
+- If any third-party SDK exists, it must be fully disabled for user-data paths in v1."
+"Story","1002","[P0-02] 保存パス統一 + バックアップ除外（音声必須／DB・テキストも除外寄り）","100","Highest","","iOS Engineer (Storage)","lifememo","v1","ondevice","p0","storage","Storage","Owner (Role): iOS Engineer (Storage)
+
+Goal:
+- Unify persistent storage under Application Support.
+- Exclude audio (must) and DB/text (prefer) from device backups; provide encrypted manual backup instead.
+
+Acceptance Criteria:
+- DB/audio/transcripts/metadata are all stored under Application Support with a single, documented layout.
+- Audio directory is excluded from backup.
+- DB and transcript/text are excluded from backup (v1 policy).
+- If migrating from previous versions, existing user data is migrated without loss.
+
+Test Steps (Manual):
+1. Fresh install: create memo + recording + transcript. Verify files are created in expected Application Support paths.
+2. Verify backup-exclusion flag is applied to audio and DB/transcript directories (debug screen or resource values).
+3. Upgrade simulation: start from old data layout → update → verify all content remains accessible.
+
+Suggested Automation:
+- Unit tests for path resolver: always returns Application Support paths.
+- Unit tests for isExcludedFromBackupKey = true on target directories."
+"Story","1003","[P0-03] ロック中「閲覧不可」＋「録音継続」両立（UIブロック + Data Protection）","130","Highest","","iOS Engineer (Security/Storage)","lifememo","v1","ondevice","p0","security","Security","Owner (Role): iOS Engineer (Security/Storage)
+
+Goal:
+- When locked: block viewing UI reliably (App Lock gate).
+- DB is strongly protected; recording continues while locked via 'recording-only writable' protection.
+
+Acceptance Criteria:
+- While device is locked (or Protected Data unavailable), memo list/detail/search never reveals content; privacy screen is shown.
+- Recording continues uninterrupted while locked; resulting audio file is valid and playable.
+- DB uses strong file protection (locked access not allowed).
+- Recording file uses 'writable while open' protection during recording, then escalates to stronger protection after stop.
+
+Test Steps (Manual):
+1. Start recording → lock device for 5 minutes → unlock → stop → verify audio plays fully.
+2. While locked, attempt to open app → content is not visible (privacy screen).
+3. After stop, verify file protection class/attributes changed as specified (debug check).
+
+Suggested Automation:
+- Unit test: after recording stop, file protection is escalated.
+- UI test: app resume shows privacy screen when App Lock enabled.
+
+Dependencies:
+- (Issue ID 1002) [P0-02] 保存パス統一 + バックアップ除外"
+"Story","1101","[P0-04] バックグラウンド録音の堅牢化（割り込み/ルート変更/ロック対応）","110","Highest","","iOS Engineer (Audio)","lifememo","v1","ondevice","p0","audio","Audio","Owner (Role): iOS Engineer (Audio)
+
+Goal:
+- Make background/locked recording reliable.
+- Handle interruptions and route changes gracefully.
+
+Acceptance Criteria:
+- Recording continues in background/lock for long sessions without corruption.
+- Interruption events (calls/alarms/Siri) are handled: safe stop/resume with clear state.
+- Route changes (AirPods connect/disconnect) do not crash or corrupt recordings.
+
+Test Steps (Manual):
+1. Record → lock device for 15/30/60 minutes → unlock → verify audio file integrity.
+2. During recording, trigger a phone call/alarm → verify state transitions are correct and user is informed.
+3. During recording, connect/disconnect AirPods → verify no crash and recording remains valid.
+
+Suggested Automation:
+- Unit tests around AVAudioSession interruption handler state transitions (where feasible).
+
+Dependencies:
+- (Issue ID 1003) [P0-03] ロック中閲覧不可＋録音継続 両立"
+"Story","1102","[P0-05] 録音品質プリセット実装（省容量/標準/高音質）＋録音反映（SoT一本化）","110","Highest","","iOS Engineer (Audio)","lifememo","v1","ondevice","p0","settings","Audio","Owner (Role): iOS Engineer (Audio)
+
+Goal:
+- Define 3 recording quality presets and ensure they are applied to actual recording settings.
+- Single source of truth for settings (no UI-only change).
+
+Acceptance Criteria:
+- Three presets exist (Storage Saver / Balanced default / High).
+- Changing preset changes the produced file characteristics (size/bitrate, etc.).
+- Changing settings during a recording does not break; policy is defined (recommended: applies next recording).
+
+Test Steps (Manual):
+1. For each preset, record 1 minute and compare file size/metadata differences.
+2. Change preset mid-recording; verify behavior matches policy (e.g., next recording uses new preset).
+
+Suggested Automation:
+- Unit test: preset-to-recorder-settings mapping.
+- Unit test: recorder always reads settings from the unified source at start."
+"Story","1103","[P0-06] 実メータ波形（RMS/Peak）＋バックグラウンドは計測継続・描画は復帰後追従","110","Highest","","iOS Engineer (Audio/UI)","lifememo","v1","ondevice","p0","waveform","Audio","Owner (Role): iOS Engineer (Audio/UI)
+
+Goal:
+- Waveform must reflect real input levels (not decorative).
+- While backgrounded: keep metering, but UI updates resume on foreground.
+
+Acceptance Criteria:
+- In foreground, waveform responds immediately to input loudness changes.
+- Background → foreground does not crash or glitch; waveform resumes correctly.
+- Meter values are stored while backgrounded and can be rendered on return (per product decision).
+
+Test Steps (Manual):
+1. Speak softly/loudly; verify waveform changes accordingly.
+2. Record → lock/unlock → verify recording continues; waveform resumes without corruption.
+3. Silence test: waveform remains stable and does not jitter.
+
+Suggested Automation:
+- Unit test: smoothing/normalization logic (if implemented).
+- UI smoke test: resume from background does not crash.
+
+Dependencies:
+- (Issue ID 1101) [P0-04] バックグラウンド録音の堅牢化"
+"Story","1201","[P0-07] オンデバイス書き起こし対応範囲固定（ja_JP/en_US）＋非対応端末は機能無効化","120","Highest","","iOS Engineer (STT)","lifememo","v1","ondevice","p0","stt","Speech","Owner (Role): iOS Engineer (STT)
+
+Goal:
+- Support on-device transcription for ja_JP and en_US only in v1.
+- Disable transcription UI on unsupported devices/locales; never fallback to network.
+
+Acceptance Criteria:
+- Only ja_JP and en_US are offered as supported languages in v1.
+- If on-device recognition is unavailable, transcription button is disabled with a clear explanation.
+- No network fallback occurs (on-device only; otherwise fail).
+
+Test Steps (Manual):
+1. Supported device + ja_JP: record and transcribe in foreground; verify results.
+2. Unsupported conditions: verify button disabled + explanation shown.
+3. Airplane mode transcription attempt: supported device still works; unsupported fails without network.
+
+Suggested Automation:
+- Unit test: eligibility logic (device + locale).
+- UI test: unsupported state disables the action and shows explanation.
+
+Dependencies:
+- (Issue ID 1001) [P0-01] 自動の外部送信ゼロ"
+"Story","1202","[P0-08] リアルタイム書き起こし＋編集可能（ライブ更新と編集の競合回避）","120","Highest","","iOS Engineer (STT/UI)","lifememo","v1","ondevice","p0","editable","Speech","Owner (Role): iOS Engineer (STT/UI)
+
+Goal:
+- In foreground, transcript grows in real time.
+- User can edit during recording and after; edits must not be overwritten by live updates.
+
+Acceptance Criteria:
+- Real-time transcription updates while recording in foreground.
+- Editing during recording is supported with a defined conflict policy (recommended: pause live updates while editing).
+- Edits persist after stop and reopen; live updates never destroy user edits.
+
+Test Steps (Manual):
+1. Start recording and verify transcript grows in real time.
+2. Enter edit mode mid-recording; edit text; ensure live updates follow the policy and edits persist.
+3. Stop recording; edit again; relaunch app; verify final text is preserved.
+
+Suggested Automation:
+- Unit tests for edit-state vs live-update state transitions.
+- UI test: edit → save → reopen retains content.
+
+Dependencies:
+- (Issue ID 1201) [P0-07] オンデバイス書き起こし対応範囲固定"
+"Story","1203","[P0-09] 書き起こしキュー（同時1本）＋録音優先スケジューラ（復帰後/充電中/安定時のみ）","120","Highest","","iOS Engineer (STT)","lifememo","v1","ondevice","p0","queue","Speech","Owner (Role): iOS Engineer (STT)
+
+Goal:
+- Enforce single-concurrency transcription queue.
+- Prioritize recording; run transcription only when safe (foreground/charging/cool).
+
+Acceptance Criteria:
+- At most one transcription job runs at any time.
+- User can cancel a job and the system transitions cleanly.
+- In background/locked: recording only; transcription is deferred.
+- Low power / high thermal states defer transcription automatically.
+
+Test Steps (Manual):
+1. Queue multiple memos for transcription; verify strict one-at-a-time processing.
+2. Cancel mid-job; verify it stops and state remains consistent.
+3. Enable Low Power Mode; verify transcription defers; start charging/return to app; verify it resumes.
+4. Stress: transcription never causes recording dropouts.
+
+Suggested Automation:
+- Unit tests for queue exclusivity and state machine.
+- Unit tests for run-eligibility conditions (power/thermal/foreground/charging).
+
+Dependencies:
+- (Issue ID 1202) [P0-08] リアルタイム書き起こし＋編集可能
+- (Issue ID 1101) [P0-04] バックグラウンド録音の堅牢化"
+"Story","1301","[P1-01] App Lock（設定でON）＋初回オンボーディングで推奨＋App Switcherマスク","130","High","","iOS Engineer (Security/UI)","lifememo","v1","ondevice","p1","applock","Security","Owner (Role): iOS Engineer (Security/UI)
+
+Goal:
+- Provide optional App Lock (setting ON) with onboarding recommendation.
+- Always mask content in App Switcher.
+
+Acceptance Criteria:
+- App Lock can be enabled/disabled in Settings (default OFF).
+- When enabled, app requires auth on resume; failure cases handled cleanly.
+- App Switcher always shows a masked screen (no content leakage).
+
+Test Steps (Manual):
+1. Toggle App Lock OFF → app resumes without auth.
+2. Toggle App Lock ON → app resumes with auth; verify fail/retry paths.
+3. Background the app and open App Switcher → verify mask screen is shown.
+
+Suggested Automation:
+- UI tests for settings toggle and resume behavior.
+
+Dependencies:
+- (Issue ID 1003) [P0-03] ロック中閲覧不可＋録音継続 両立"
+"Task","1302","[P1-02] アプリ外露出ゼロ（Spotlight/通知/外部インデックス禁止）","130","High","","iOS Engineer (Core)","lifememo","v1","ondevice","p1","no-exposure","Security","Owner (Role): iOS Engineer (Core)
+
+Goal:
+- Keep all content strictly in-app only (no Spotlight/Siri suggestions/content notifications).
+
+Acceptance Criteria:
+- Memo content does not appear in Spotlight search results.
+- If notifications exist, they must not include title/body/transcript content (content-less only).
+- No external indexing or share extensions that leak content by default.
+
+Test Steps (Manual):
+1. Create several memos; search in Spotlight; verify none are discoverable.
+2. If notifications are used, lock screen/notification center should never show content."
+"Story","1401","[P1-03] 暗号化フルバックアップ（ユーザー選択）＋保存（Files/iCloud Drive/AirDrop）＋復元","140","High","","iOS Engineer (Storage/Export)","lifememo","v1","ondevice","p1","backup","Export","Owner (Role): iOS Engineer (Storage/Export)
+
+Goal:
+- Provide encrypted full backup with user-selectable contents.
+- Support restore (import) to make backup usable.
+
+Acceptance Criteria:
+- Backup is encrypted; cannot be restored without password.
+- User can choose which data to include (audio/text/transcripts/tags/folders/location).
+- Backup can be saved via Files picker (iCloud Drive selectable) and shared via AirDrop.
+- Restore succeeds and reconstructs the selected data correctly.
+- Wrong password/corrupt file fails safely without damaging existing data.
+
+Test Steps (Manual):
+1. Create backup (audio+text+transcript) → save to Files → confirm file exists.
+2. Delete app data → restore from backup → confirm data is back as expected.
+3. Try wrong password → verify safe failure; no data corruption.
+4. Use a corrupted/partial backup file → verify safe error handling.
+
+Suggested Automation:
+- Unit tests for backup manifest versioning and encryption/decryption success/failure paths.
+- UI smoke tests for create-backup and restore flows.
+
+Dependencies:
+- (Issue ID 1002) [P0-02] 保存パス統一 + バックアップ除外
+- (Issue ID 1003) [P0-03] ロック中閲覧不可＋録音継続 両立"
+"Story","1501","[P1-04] ストレージ管理（上限GB設定＋自動削除ON/OFF＋クリーンアップ導線）","150","High","","iOS Engineer (Storage/UI)","lifememo","v1","ondevice","p1","storage","Storage","Owner (Role): iOS Engineer (Storage/UI)
+
+Goal:
+- Let users set a storage limit (GB) and optionally auto-delete to prevent storage exhaustion.
+- Provide cleanup UI when auto-delete is off.
+
+Acceptance Criteria:
+- User can set a storage limit in GB; current usage is visible.
+- Auto-delete ON: exceeding limit deletes oldest audio first until below limit.
+- Auto-delete OFF: exceeding limit surfaces warning + cleanup workflow; nothing is deleted automatically.
+- No surprising deletions; behavior matches settings.
+
+Test Steps (Manual):
+1. Set a small limit and record until exceed → warning appears.
+2. Auto-delete ON → exceed → oldest recordings are removed until under limit.
+3. Auto-delete OFF → exceed → cleanup UI allows user to delete selected items.
+
+Suggested Automation:
+- Unit test for deletion candidate ordering (oldest-first).
+- UI tests for settings and cleanup flow.
+
+Dependencies:
+- (Issue ID 1002) [P0-02] 保存パス統一 + バックアップ除外"
+"Task","1601","[P1-05] サポート用ローカルログのエクスポート（自動送信なし）","160","High","","iOS Engineer (Core)","lifememo","v1","ondevice","p1","logs","Diagnostics","Owner (Role): iOS Engineer (Core)
+
+Goal:
+- Provide user-initiated local log export for support; never auto-send logs.
+
+Acceptance Criteria:
+- User can export logs via Settings/Support screen.
+- By default, logs do not include memo body/transcript/audio content (technical info only).
+- Logs are useful for debugging (device/os/app version, error history, state transitions).
+
+Test Steps (Manual):
+1. Trigger error cases (permission denied / storage full) and confirm logs record them.
+2. Export logs to Files and verify file is created and readable.
+3. Confirm no user content is present in exported logs by default.
+
+Suggested Automation:
+- Unit tests for log redaction/sanitization.
+- Unit tests for log file creation."
+"Story","1701","[P2-01] 書き起こし修正の強化（原文/確定稿分離・履歴・セグメント編集）","170","Medium","","iOS Engineer (UX/Data)","lifememo","v1","ondevice","p2","transcript","Enhancements","Owner (Role): iOS Engineer (UX/Data)
+
+Goal:
+- Separate machine transcript vs user-approved final text.
+- Enable segment/timestamp-based editing and optional history.
+
+Acceptance Criteria:
+- Original machine transcript is preserved while user edits a separate final version.
+- Editing remains usable for long transcripts (no severe lag).
+
+Test Steps (Manual):
+1. Edit a long transcript; verify performance remains acceptable.
+2. Switch between original vs final view (if UI provides it) and confirm data integrity.
+
+Suggested Automation:
+- UI smoke tests for long transcript editing.
+
+Dependencies:
+- (Issue ID 1202) [P0-08] リアルタイム書き起こし＋編集可能"
+"Story","1702","[P2-02] タグ/フォルダ/検索強化（アプリ内完結）","170","Medium","","iOS Engineer (Data/Search)","lifememo","v1","ondevice","p2","search","Enhancements","Owner (Role): iOS Engineer (Data/Search)
+
+Goal:
+- Improve organization (tags/folders) and fast in-app search/filter/sort without Spotlight.
+
+Acceptance Criteria:
+- Tags and folders support practical organization workflows.
+- In-app search/filter/sort works reliably for large datasets.
+- No external indexing (Spotlight) is introduced.
+
+Test Steps (Manual):
+1. Create 100/1000 memos and test search/filter/sort responsiveness.
+2. Verify tag/folder updates reflect correctly across list/detail views.
+
+Suggested Automation:
+- Unit tests for search query correctness (filters/sorts).
+- Optional performance tests for search time vs dataset size."
+"Story","1703","[P2-03] 位置情報の取り扱い強化（デフォルトOFF・取得タイミング/精度の設定化）","170","Medium","","iOS Engineer (Privacy/UX)","lifememo","v1","ondevice","p2","location","Enhancements","Owner (Role): iOS Engineer (Privacy/UX)
+
+Goal:
+- Make location capture privacy-friendly: default OFF; configurable timing and accuracy.
+
+Acceptance Criteria:
+- Location is OFF by default and does not request permission unless enabled/needed.
+- When enabled, capture timing and accuracy match settings.
+- No reverse-geocoding network calls are used by default.
+
+Test Steps (Manual):
+1. Location OFF: create memo; confirm no location saved and no permission prompt occurs.
+2. Location ON: create memo; confirm saved fields match chosen timing/accuracy.
+3. Permission denied: app fails safely and informs user.
+
+Suggested Automation:
+- Unit tests for location save logic branches (ON/OFF, permission states)."
+"Task","1704","[P2-04] （スパイク）オンデバイス要約の検討（外部通信なし・モデル同梱前提）","170","Medium","","iOS Engineer (R&D) + PM","lifememo","v1","ondevice","p2","spike","Enhancements","Owner (Role): iOS Engineer (R&D) + PM
+
+Goal:
+- Investigate feasibility of fully on-device summarization without external communication.
+- Define constraints: device support, memory/thermal impact, app size, UX.
+
+Acceptance Criteria:
+- Produce a feasibility note: target devices, expected latency, memory, thermal, app size impact.
+- Decide go/no-go criteria and what would be required to ship safely.
+
+Test Steps (Manual):
+1. Prototype locally on a representative device and measure latency/thermal/battery for long inputs.
+2. Document results and recommendations.
+
+Suggested Automation:
+- Create a simple benchmarking harness to re-run performance tests consistently.
+
+Notes:
+- This is research only; no external model download and no network calls."

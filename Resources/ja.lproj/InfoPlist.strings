@@ -1,0 +1,5 @@
+/* InfoPlist.strings (Japanese) - LifeMemo */
+
+"NSMicrophoneUsageDescription" = "LifeMemoは音声メモを録音するためにマイクを使用します。";
+"NSSpeechRecognitionUsageDescription" = "LifeMemoは録音した音声をテキストに変換するために音声認識を使用します。";
+"NSLocationWhenInUseUsageDescription" = "LifeMemoは録音に位置情報を記録するために位置情報を使用します。";
