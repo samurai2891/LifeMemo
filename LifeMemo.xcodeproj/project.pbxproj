@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -216,7 +216,7 @@
 		10B98E1957584D626D0BC11B /* HighlightInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightInfo.swift; sourceTree = "<group>"; };
 		110661088DB81D336EB11B79 /* TranscriptSegmentEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSegmentEntity.swift; sourceTree = "<group>"; };
 		1153394D3E60A66D2F2A8B85 /* RestoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestoreView.swift; sourceTree = "<group>"; };
-		13B841852C2D42D295968A53 /* LifeMemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LifeMemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		13B841852C2D42D295968A53 /* LifeMemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LifeMemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		142475091950781D5FEAB49F /* ExportServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportServiceProtocol.swift; sourceTree = "<group>"; };
 		166C78D72F78BBC2C576D02C /* SummarizationResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummarizationResult.swift; sourceTree = "<group>"; };
 		1716FE7460A89052CC04411D /* DiarizedSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarizedSegment.swift; sourceTree = "<group>"; };
@@ -894,7 +894,6 @@
 			);
 			mainGroup = 68EDB620EA6FE435F277DCC6;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -1329,6 +1328,7 @@
 				CODE_SIGN_ENTITLEMENTS = Resources/LifeMemo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 52PPJXD67Z;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

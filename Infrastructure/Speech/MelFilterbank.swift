@@ -64,10 +64,9 @@ enum MelFilterbank {
         }
         defer { vDSP_destroy_fftsetup(fftSetup) }
 
-        // DCT setup
-        guard let dctSetup = vDSP_DCT_CreateSetup(nil, vDSP_Length(numMelFilters), .II) else {
-            return MFCCResult(mfccs: [], deltas: [], deltaDeltas: [], rmsEnergies: [], frameTimestamps: [])
-        }
+        // Pre-compute DCT-II matrix [numMFCCs x numMelFilters]
+        // X[k] = sum_{n=0}^{N-1} x[n] * cos(π * (n + 0.5) * k / N)
+        let dctMatrix = buildDCTMatrix(outputDim: numMFCCs, inputDim: numMelFilters)
 
         var allMFCCs: [[Float]] = []
         var allEnergies: [Float] = []
@@ -105,10 +104,8 @@ enum MelFilterbank {
             var count = Int32(numMelFilters)
             vvlogf(&logMel, logMel, &count)
 
-            // DCT-II → MFCCs
-            var dctOutput = [Float](repeating: 0, count: numMelFilters)
-            vDSP_DCT_Execute(dctSetup, logMel, &dctOutput)
-            let mfcc = Array(dctOutput.prefix(numMFCCs))
+            // DCT-II → MFCCs (manual matrix multiply)
+            let mfcc = applyDCTMatrix(dctMatrix: dctMatrix, input: logMel)
 
             allMFCCs.append(mfcc)
             allTimestamps.append(Float(start) / sampleRate)
@@ -291,12 +288,32 @@ enum MelFilterbank {
         return melEnergies
     }
 
-    // MARK: - DCT (standalone for testing)
+    // MARK: - DCT-II (Manual Implementation)
 
-    static func computeDCT(logMel: [Float], dctSetup: OpaquePointer) -> [Float] {
-        var dctOutput = [Float](repeating: 0, count: logMel.count)
-        vDSP_DCT_Execute(dctSetup, logMel, &dctOutput)
-        return Array(dctOutput.prefix(numMFCCs))
+    /// Builds a DCT-II matrix of shape [outputDim x inputDim].
+    ///
+    /// `M[k][n] = cos(π * (n + 0.5) * k / N)` for k in 0..<outputDim, n in 0..<inputDim.
+    static func buildDCTMatrix(outputDim: Int, inputDim: Int) -> [[Float]] {
+        let piOverN = Float.pi / Float(inputDim)
+        return (0..<outputDim).map { k in
+            (0..<inputDim).map { n in
+                cosf(piOverN * (Float(n) + 0.5) * Float(k))
+            }
+        }
+    }
+
+    /// Applies a pre-computed DCT matrix to an input vector.
+    ///
+    /// - Parameters:
+    ///   - dctMatrix: [outputDim x inputDim] matrix from `buildDCTMatrix`.
+    ///   - input: Input vector of length inputDim.
+    /// - Returns: Output vector of length outputDim.
+    static func applyDCTMatrix(dctMatrix: [[Float]], input: [Float]) -> [Float] {
+        dctMatrix.map { row in
+            var result: Float = 0
+            vDSP_dotpr(row, 1, input, 1, &result, vDSP_Length(min(row.count, input.count)))
+            return result
+        }
     }
 
     // MARK: - Delta Computation
