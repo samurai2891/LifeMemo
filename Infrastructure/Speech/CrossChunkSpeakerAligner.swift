@@ -5,12 +5,12 @@ import Foundation
 /// Each chunk's diarization produces local speaker indices (0, 1, 2...) that may
 /// not correspond to the same physical speakers across chunks. This aligner builds
 /// a global speaker map by greedily matching local speaker profiles to global
-/// profiles using feature vector distance.
+/// profiles using cosine distance on MFCC embeddings (with legacy centroid fallback).
 ///
 /// ## Algorithm
 /// 1. Chunk 0's speakers become the initial global reference profiles.
 /// 2. For each subsequent chunk, compute a distance matrix (local x global).
-/// 3. Greedily match pairs in ascending distance order (threshold ≤ 2.0).
+/// 3. Greedily match pairs in ascending distance order (threshold ≤ 0.4 for MFCC).
 /// 4. Unmatched local speakers are assigned new global indices.
 /// 5. Matched global profiles are updated with weighted averaging.
 enum CrossChunkSpeakerAligner {
@@ -27,7 +27,11 @@ enum CrossChunkSpeakerAligner {
 
     // MARK: - Configuration
 
-    private static let matchThreshold: Float = 2.0
+    /// Distance threshold for MFCC embedding matching (cosine distance).
+    private static let mfccMatchThreshold: Float = 0.4
+
+    /// Legacy distance threshold for centroid-based matching.
+    private static let legacyMatchThreshold: Float = 2.0
 
     // MARK: - Public API
 
@@ -50,7 +54,8 @@ enum CrossChunkSpeakerAligner {
                 id: profile.id,
                 speakerIndex: idx,
                 centroid: profile.centroid,
-                sampleCount: profile.sampleCount
+                sampleCount: profile.sampleCount,
+                mfccEmbedding: profile.mfccEmbedding
             )
         }
 
@@ -79,6 +84,17 @@ enum CrossChunkSpeakerAligner {
 
     // MARK: - Private
 
+    /// Computes distance between two speaker profiles, preferring MFCC embedding.
+    private static func computeDistance(
+        local: SpeakerProfile,
+        global: SpeakerProfile
+    ) -> (distance: Float, usedMFCC: Bool) {
+        if let localMFCC = local.mfccEmbedding, let globalMFCC = global.mfccEmbedding {
+            return (distance: localMFCC.cosineDistance(to: globalMFCC), usedMFCC: true)
+        }
+        return (distance: local.centroid.distance(to: global.centroid), usedMFCC: false)
+    }
+
     /// Matches local speakers from a chunk to existing global speakers using greedy assignment.
     private static func matchChunkToGlobal(
         localProfiles: [SpeakerProfile],
@@ -89,11 +105,16 @@ enum CrossChunkSpeakerAligner {
         }
 
         // Build distance matrix
-        var distances: [(localIdx: Int, globalIdx: Int, distance: Float)] = []
+        var distances: [(localIdx: Int, globalIdx: Int, distance: Float, usedMFCC: Bool)] = []
         for local in localProfiles {
             for global in globalProfiles {
-                let dist = local.centroid.distance(to: global.centroid)
-                distances.append((localIdx: local.speakerIndex, globalIdx: global.speakerIndex, distance: dist))
+                let (dist, usedMFCC) = computeDistance(local: local, global: global)
+                distances.append((
+                    localIdx: local.speakerIndex,
+                    globalIdx: global.speakerIndex,
+                    distance: dist,
+                    usedMFCC: usedMFCC
+                ))
             }
         }
 
@@ -109,7 +130,9 @@ enum CrossChunkSpeakerAligner {
         for entry in distances {
             guard !matchedLocal.contains(entry.localIdx),
                   !matchedGlobal.contains(entry.globalIdx) else { continue }
-            guard entry.distance <= matchThreshold else { continue }
+
+            let threshold = entry.usedMFCC ? mfccMatchThreshold : legacyMatchThreshold
+            guard entry.distance <= threshold else { continue }
 
             localToGlobal[entry.localIdx] = entry.globalIdx
             matchedLocal.insert(entry.localIdx)
@@ -118,10 +141,21 @@ enum CrossChunkSpeakerAligner {
             // Update global profile with weighted merge
             if let globalProfileIdx = updatedProfiles.firstIndex(where: { $0.speakerIndex == entry.globalIdx }),
                let localProfile = localProfiles.first(where: { $0.speakerIndex == entry.localIdx }) {
-                updatedProfiles[globalProfileIdx] = updatedProfiles[globalProfileIdx].merging(
+
+                var merged = updatedProfiles[globalProfileIdx].merging(
                     newCentroid: localProfile.centroid,
                     newSampleCount: localProfile.sampleCount
                 )
+
+                // Also merge MFCC embedding if available
+                if let localMFCC = localProfile.mfccEmbedding {
+                    merged = merged.merging(
+                        newMFCCEmbedding: localMFCC,
+                        newSampleCount: localProfile.sampleCount
+                    )
+                }
+
+                updatedProfiles[globalProfileIdx] = merged
             }
         }
 
@@ -133,7 +167,8 @@ enum CrossChunkSpeakerAligner {
                 id: UUID(),
                 speakerIndex: newGlobalIndex,
                 centroid: local.centroid,
-                sampleCount: local.sampleCount
+                sampleCount: local.sampleCount,
+                mfccEmbedding: local.mfccEmbedding
             ))
         }
 
