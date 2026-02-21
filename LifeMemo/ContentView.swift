@@ -9,6 +9,24 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+    var body: some View {
+        TabView {
+            RecordingView()
+                .tabItem {
+                    Label("録音", systemImage: "mic.fill")
+                }
+
+            MemoListView()
+                .tabItem {
+                    Label("メモ", systemImage: "list.bullet")
+                }
+        }
+    }
+}
+
+// MARK: - Memo list (original content)
+
+struct MemoListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var items: [Item]
 
