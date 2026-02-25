@@ -1,0 +1,53 @@
+name: iOS CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Project
+        run: xcodegen generate
+
+      - name: Resolve Simulator Destination
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/resolve_simulator_destination.sh
+          destination="$(scripts/resolve_simulator_destination.sh)"
+          echo "SIM_DESTINATION=${destination}" >> "$GITHUB_ENV"
+          echo "Resolved destination: ${destination}"
+
+      - name: Build
+        run: >
+          xcodebuild
+          -project LifeMemo.xcodeproj
+          -scheme LifeMemo
+          -sdk iphonesimulator
+          -destination "${SIM_DESTINATION}"
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          build
+
+      - name: Test
+        run: >
+          xcodebuild
+          -project LifeMemo.xcodeproj
+          -scheme LifeMemo
+          -sdk iphonesimulator
+          -destination "${SIM_DESTINATION}"
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          test

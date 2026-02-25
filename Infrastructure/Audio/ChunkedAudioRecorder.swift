@@ -1,5 +1,6 @@
 import Foundation
 import AVFAudio
+import os.log
 
 /// Core recording engine that automatically splits audio into fixed-duration chunks.
 ///
@@ -30,6 +31,7 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
     private let repository: SessionRepository
     private let fileStore: FileStore
     private let transcriptionQueue: TranscriptionQueueActor
+    private let logger = Logger(subsystem: "com.lifememo.app", category: "ChunkedAudioRecorder")
 
     // MARK: - Metering
 
@@ -116,7 +118,7 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
         do {
             try startNewChunk(sessionId: sid)
         } catch {
-            print("ChunkedAudioRecorder: rotate failed: \(error.localizedDescription)")
+            logger.error("Chunk rotation failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -180,8 +182,9 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
 
         // Validate the chunk produced a usable file
         guard fileSize > 0, duration > 0 else {
-            print("ChunkedAudioRecorder: discarding empty chunk \(chunkId) "
-                  + "(size=\(fileSize), duration=\(duration))")
+            logger.warning(
+                "Discarding empty chunk \(chunkId.uuidString, privacy: .public) (size=\(fileSize), duration=\(duration))"
+            )
             return
         }
 

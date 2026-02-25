@@ -1,5 +1,6 @@
 import Foundation
 import CoreData
+import os.log
 
 /// Paginated session loader optimized for large datasets.
 ///
@@ -16,6 +17,7 @@ final class PaginatedSessionLoader: ObservableObject {
     private let context: NSManagedObjectContext
     private let pageSize: Int
     private var currentPage = 0
+    private let logger = Logger(subsystem: "com.lifememo.app", category: "PaginatedSearch")
 
     init(context: NSManagedObjectContext, pageSize: Int = 20) {
         self.context = context
@@ -46,7 +48,7 @@ final class PaginatedSessionLoader: ObservableObject {
             hasMore = newSummaries.count == pageSize
             currentPage += 1
         } catch {
-            print("PaginatedSessionLoader: fetch failed: \(error)")
+            logger.error("Page fetch failed: \(error.localizedDescription, privacy: .public)")
         }
 
         isLoading = false

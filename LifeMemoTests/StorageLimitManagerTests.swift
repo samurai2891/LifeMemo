@@ -7,6 +7,11 @@ final class StorageLimitManagerTests: XCTestCase {
     private static let limitGBKey = "storageLimitGB"
     private static let autoDeleteKey = "storageAutoDelete"
 
+    private func usagePercentage(usageGB: Double, limitGB: Double) -> Double {
+        guard limitGB > 0 else { return 0 }
+        return (usageGB / limitGB) * 100
+    }
+
     override func setUp() {
         super.setUp()
         UserDefaults.standard.removeObject(forKey: Self.limitGBKey)
@@ -53,14 +58,14 @@ final class StorageLimitManagerTests: XCTestCase {
     func testWarningThresholdAtExactly90Percent() {
         let usageGB = 9.0
         let limitGB = 10.0
-        let percentage = (usageGB / limitGB) * 100
+        let percentage = usagePercentage(usageGB: usageGB, limitGB: limitGB)
         XCTAssertTrue(percentage >= 90, "90% usage should trigger warning")
     }
 
     func testWarningThresholdBelow90Percent() {
         let usageGB = 8.9
         let limitGB = 10.0
-        let percentage = (usageGB / limitGB) * 100
+        let percentage = usagePercentage(usageGB: usageGB, limitGB: limitGB)
         XCTAssertFalse(percentage >= 90, "89% usage should not trigger warning")
     }
 
@@ -69,21 +74,21 @@ final class StorageLimitManagerTests: XCTestCase {
     func testExceededThresholdAtExactly100Percent() {
         let usageGB = 10.0
         let limitGB = 10.0
-        let percentage = (usageGB / limitGB) * 100
+        let percentage = usagePercentage(usageGB: usageGB, limitGB: limitGB)
         XCTAssertTrue(percentage >= 100, "100% usage should be exceeded")
     }
 
     func testExceededThresholdAbove100Percent() {
         let usageGB = 10.5
         let limitGB = 10.0
-        let percentage = (usageGB / limitGB) * 100
+        let percentage = usagePercentage(usageGB: usageGB, limitGB: limitGB)
         XCTAssertTrue(percentage >= 100, "105% usage should be exceeded")
     }
 
     func testNotExceededBelow100Percent() {
         let usageGB = 9.9
         let limitGB = 10.0
-        let percentage = (usageGB / limitGB) * 100
+        let percentage = usagePercentage(usageGB: usageGB, limitGB: limitGB)
         XCTAssertFalse(percentage >= 100, "99% usage should not be exceeded")
     }
 
@@ -91,7 +96,7 @@ final class StorageLimitManagerTests: XCTestCase {
 
     func testZeroLimitProducesZeroPercentage() {
         let limitGB = 0.0
-        let percentage = limitGB > 0 ? (5.0 / limitGB) * 100 : 0
+        let percentage = usagePercentage(usageGB: 5.0, limitGB: limitGB)
         XCTAssertEqual(percentage, 0, "Zero limit should produce 0% to avoid division by zero")
     }
 }

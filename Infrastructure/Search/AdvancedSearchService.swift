@@ -1,5 +1,6 @@
 import Foundation
 import CoreData
+import os.log
 
 /// Advanced search service using FTS5 for fast full-text search
 /// with support for date range filtering, highlight filtering, and pagination.
@@ -16,6 +17,7 @@ final class AdvancedSearchService {
     private let fts5Manager: FTS5Manager
     private let context: NSManagedObjectContext
     private let pageSize: Int
+    private let logger = Logger(subsystem: "com.lifememo.app", category: "AdvancedSearch")
 
     init(
         fts5Manager: FTS5Manager,
@@ -132,7 +134,7 @@ final class AdvancedSearchService {
                 hasMore: offset + pageSize < totalCount
             )
         } catch {
-            print("AdvancedSearchService: filter-only search failed: \(error)")
+            logger.error("Filter-only search failed: \(error.localizedDescription, privacy: .public)")
             return SearchResults(
                 segments: [],
                 sessionIds: [],
@@ -209,7 +211,7 @@ final class AdvancedSearchService {
             let results = try context.fetch(request)
             return Set(results.compactMap { $0["id"] as? UUID })
         } catch {
-            print("AdvancedSearchService: fetch filtered sessions failed: \(error)")
+            logger.error("Fetching filtered sessions failed: \(error.localizedDescription, privacy: .public)")
             return []
         }
     }
@@ -253,7 +255,7 @@ final class AdvancedSearchService {
                 )
             }
         } catch {
-            print("AdvancedSearchService: enrich matches failed: \(error)")
+            logger.error("Enrich matches failed: \(error.localizedDescription, privacy: .public)")
             return []
         }
     }
@@ -276,7 +278,7 @@ final class AdvancedSearchService {
             }
             fts5Manager.rebuildIndex(segments: segments)
         } catch {
-            print("AdvancedSearchService: rebuild index failed: \(error)")
+            logger.error("Rebuild index failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

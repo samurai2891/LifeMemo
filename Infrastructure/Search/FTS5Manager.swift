@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import os.log
 
 /// Manages a standalone SQLite FTS5 full-text search index.
 ///
@@ -18,6 +19,7 @@ final class FTS5Manager {
     private var db: OpaquePointer?
     private let dbPath: String
     private let queue = DispatchQueue(label: "com.lifememo.fts5", qos: .userInitiated)
+    private let logger = Logger(subsystem: "com.lifememo.app", category: "FTS5")
 
     // Store the transient destructor constant for sqlite3_bind_text.
     // SQLITE_TRANSIENT tells SQLite to make its own copy of the string data.
@@ -46,7 +48,7 @@ final class FTS5Manager {
 
     private func openDatabase() {
         guard sqlite3_open(dbPath, &db) == SQLITE_OK else {
-            print("FTS5Manager: Failed to open database at \(dbPath)")
+            logger.error("Failed to open FTS database at \(self.dbPath, privacy: .public)")
             return
         }
     }
@@ -268,7 +270,7 @@ final class FTS5Manager {
 
                 if sqlite3_step(stmt) != SQLITE_DONE {
                     let errMsg = sqlite3_errmsg(db).map { String(cString: $0) } ?? "unknown"
-                    print("FTS5Manager: insert failed during rebuild: \(errMsg)")
+                    logger.error("Insert failed during FTS rebuild: \(errMsg, privacy: .public)")
                 }
                 sqlite3_reset(stmt)
             }
@@ -298,7 +300,7 @@ final class FTS5Manager {
         var errMsg: UnsafeMutablePointer<CChar>?
         if sqlite3_exec(db, sql, nil, nil, &errMsg) != SQLITE_OK {
             if let msg = errMsg {
-                print("FTS5Manager SQL error: \(String(cString: msg))")
+                logger.error("FTS SQL error: \(String(cString: msg), privacy: .public)")
                 sqlite3_free(msg)
             }
         }

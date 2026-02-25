@@ -2,20 +2,25 @@ import AVFAudio
 
 /// Configures AVAudioSession for background recording.
 ///
-/// Activates the session with `.playAndRecord` category and `.measurement` mode,
-/// which provides high-fidelity mono input suitable for speech recognition.
+/// Activates the session with `.playAndRecord` category and `.voiceChat` mode,
+/// which enables Apple's built-in voice processing pipeline (AEC, noise suppression,
+/// AGC, beamforming) — critical for far-field speech recognition.
 final class AudioSessionConfigurator {
 
     // MARK: - Activation
 
     /// Activates the audio session for recording.
     ///
+    /// Uses `.voiceChat` mode to enable Apple's voice processing, which provides
+    /// far-field noise suppression and echo cancellation. This mode is recommended
+    /// when `setVoiceProcessingEnabled(true)` is used on the audio engine input node.
+    ///
     /// - Throws: An error if the session cannot be configured or activated.
     func activateRecordingSession() throws {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(
             .playAndRecord,
-            mode: .measurement,
+            mode: .voiceChat,
             options: [.allowBluetooth, .defaultToSpeaker, .duckOthers]
         )
         try session.setActive(true)

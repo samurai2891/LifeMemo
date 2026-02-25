@@ -88,6 +88,27 @@ final class AHCClustererTests: XCTestCase {
         XCTAssertEqual(uniqueLabels, expected, "Labels should be 0-indexed and contiguous")
     }
 
+    // MARK: - Max Cluster Cap
+
+    func testClusterCountDoesNotExceedConfiguredCap() {
+        // Build 12 highly separated embeddings so distance-threshold alone
+        // would otherwise keep many singleton clusters.
+        let embeddings = (0..<12).map { i -> SpeakerEmbedding in
+            var values = [Float](repeating: 0, count: 130)
+            values[i] = 1.0
+            return SpeakerEmbedding(values: values)
+        }
+
+        let result = AHCClusterer.cluster(embeddings: embeddings)
+
+        XCTAssertLessThanOrEqual(
+            result.numClusters,
+            AHCClusterer.maxClusters,
+            "Cluster count should be capped by maxClusters"
+        )
+        XCTAssertEqual(result.labels.count, embeddings.count)
+    }
+
     // MARK: - Helpers
 
     private func makeEmbedding(seed: Int) -> SpeakerEmbedding {

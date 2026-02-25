@@ -1,4 +1,5 @@
 import Foundation
+import os.log
 
 /// Actor-based serial queue for processing transcription jobs.
 ///
@@ -16,6 +17,7 @@ actor TranscriptionQueueActor {
     private let repository: SessionRepository
     private let transcriber: OnDeviceTranscriber
     private let diarizer: SpeakerDiarizer
+    private let logger = Logger(subsystem: "com.lifememo.app", category: "TranscriptionQueue")
 
     // MARK: - Queue State
 
@@ -177,9 +179,8 @@ actor TranscriptionQueueActor {
                 repository.checkAndFinalizeSessionStatus(sessionId: sessionId)
             }
         } catch {
-            print(
-                "TranscriptionQueueActor: transcription failed for chunk "
-                + "\(chunkId): \(error.localizedDescription)"
+            logger.error(
+                "Transcription failed for chunk \(chunkId.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)"
             )
             await markFailed(chunkId: chunkId, sessionId: sessionId)
         }

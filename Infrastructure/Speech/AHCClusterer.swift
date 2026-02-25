@@ -7,9 +7,9 @@ import Foundation
 /// until a stopping criterion is met (BIC-based or distance threshold).
 ///
 /// ## Stopping Criteria
-/// 1. Minimum cosine distance between any two clusters exceeds `maxDistanceThreshold`.
-/// 2. Number of clusters reaches `maxClusters`.
-/// Whichever is satisfied first stops the merging.
+/// 1. While cluster count is above `maxClusters`, merging continues regardless of distance.
+/// 2. Once cluster count is `<= maxClusters`, stop when minimum cosine distance
+///    exceeds `maxDistanceThreshold`.
 enum AHCClusterer {
 
     /// Result of hierarchical clustering.
@@ -34,6 +34,7 @@ enum AHCClusterer {
     /// - Returns: Cluster labels (0-indexed, contiguous) and total cluster count.
     static func cluster(embeddings: [SpeakerEmbedding]) -> ClusterResult {
         let n = embeddings.count
+        let targetClusters = max(1, maxClusters)
 
         guard n > 1 else {
             return ClusterResult(labels: n == 1 ? [0] : [], numClusters: n)
@@ -74,7 +75,11 @@ enum AHCClusterer {
 
             // Check stopping criteria
             guard mergeI >= 0 else { break }
-            if minDist > maxDistanceThreshold { break }
+            // Enforce the cluster cap first; only apply distance threshold
+            // once we are already at or below the cap.
+            if activeClusters.count <= targetClusters, minDist > maxDistanceThreshold {
+                break
+            }
             if activeClusters.count <= 1 { break }
 
             // Merge cluster j into cluster i
@@ -100,10 +105,6 @@ enum AHCClusterer {
                 distanceMatrix[k * n + mergeI] = newDist
             }
 
-            // Check max clusters
-            if activeClusters.count <= max(1, maxClusters) && minDist > maxDistanceThreshold * 0.5 {
-                // Allow natural stopping
-            }
         }
 
         // Build labels array

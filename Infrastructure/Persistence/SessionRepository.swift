@@ -1,11 +1,13 @@
 import Foundation
 import CoreData
+import os.log
 
 @MainActor
 final class SessionRepository {
 
     private let context: NSManagedObjectContext
     private let fileStore: FileStore
+    private let logger = Logger(subsystem: "com.lifememo.app", category: "SessionRepository")
 
     init(context: NSManagedObjectContext, fileStore: FileStore) {
         self.context = context
@@ -400,8 +402,9 @@ final class SessionRepository {
     // MARK: - Session Finalization
 
     /// Checks if all chunks in a session have completed transcription (done or failed).
-    /// If so, applies any pending live edits and transitions the session status
-    /// from `.processing` to `.ready`. Saves atomically in a single operation.
+    /// If all chunks are done, transitions to `.ready`; if any chunk failed,
+    /// transitions to `.error` so quality issues remain visible.
+    /// Saves atomically in a single operation.
     func checkAndFinalizeSessionStatus(sessionId: UUID) {
         guard let session = fetchSession(id: sessionId) else { return }
         guard session.status == .processing else { return }
@@ -417,7 +420,13 @@ final class SessionRepository {
         if allFinished {
             alignSpeakersAcrossChunks(session: session)
             applyLiveEdits(for: session)
-            session.status = .ready
+            let hasFailures = chunks.contains { $0.transcriptionStatus == .failed }
+            session.status = hasFailures ? .error : .ready
+            if hasFailures {
+                logger.warning(
+                    "Session finalized with failed chunks: \(sessionId.uuidString, privacy: .public)"
+                )
+            }
             saveOrLog()
         }
     }
@@ -708,7 +717,7 @@ final class SessionRepository {
         do {
             return try context.fetch(request)
         } catch {
-            print("Failed to fetch sessions: \(error.localizedDescription)")
+            logger.error("Failed to fetch sessions: \(error.localizedDescription, privacy: .public)")
             return []
         }
     }
@@ -721,7 +730,9 @@ final class SessionRepository {
         do {
             return try context.fetch(request).first
         } catch {
-            print("Failed to fetch session \(id): \(error.localizedDescription)")
+            logger.error(
+                "Failed to fetch session \(id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
             return nil
         }
     }
@@ -783,7 +794,7 @@ final class SessionRepository {
 
             return results
         } catch {
-            print("Search failed: \(error.localizedDescription)")
+            logger.error("Search failed: \(error.localizedDescription, privacy: .public)")
             return []
         }
     }
@@ -830,7 +841,7 @@ final class SessionRepository {
                 )
             }
         } catch {
-            print("Segment search failed: \(error.localizedDescription)")
+            logger.error("Segment search failed: \(error.localizedDescription, privacy: .public)")
             return []
         }
     }
@@ -954,7 +965,9 @@ final class SessionRepository {
         do {
             return try context.fetch(request).first
         } catch {
-            print("Failed to fetch segment \(id): \(error.localizedDescription)")
+            logger.error(
+                "Failed to fetch segment \(id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
             return nil
         }
     }
@@ -967,7 +980,9 @@ final class SessionRepository {
         do {
             return try context.fetch(request).first
         } catch {
-            print("Failed to fetch chunk \(id): \(error.localizedDescription)")
+            logger.error(
+                "Failed to fetch chunk \(id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
             return nil
         }
     }
@@ -977,7 +992,7 @@ final class SessionRepository {
         do {
             try context.save()
         } catch {
-            print("CoreData save error: \(error.localizedDescription)")
+            logger.error("CoreData save error: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

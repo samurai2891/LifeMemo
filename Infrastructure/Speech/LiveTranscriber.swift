@@ -2,12 +2,35 @@ import Foundation
 import Speech
 import AVFAudio
 
+/// Thread-safe holder for the active recognition request.
+///
+/// Shared between the main actor (which swaps requests during 55-second restart)
+/// and the audio render callback. Uses NSLock for synchronization.
+final class ActiveRequestHolder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var request: SFSpeechAudioBufferRecognitionRequest?
+
+    func set(_ newRequest: SFSpeechAudioBufferRecognitionRequest?) {
+        lock.withLock { request = newRequest }
+    }
+
+    /// Appends a buffer to the active request if one exists.
+    /// Buffers arriving during recognition restart (when request is nil) are safely dropped.
+    func appendBuffer(_ buffer: AVAudioPCMBuffer) {
+        lock.withLock { request?.append(buffer) }
+    }
+}
+
 /// Provides real-time speech-to-text preview during recording.
 ///
-/// Uses SFSpeechAudioBufferRecognitionRequest with AVAudioEngine tap.
-/// This is UI-preview only; persistent transcription is handled by TranscriptionQueueActor.
+/// Uses a dual-path architecture via `AudioEngineManager`:
+/// - **Path 1 (Recognition):** Raw voice-processed buffers flow unconditionally to
+///   SFSpeechRecognizer — no custom preprocessing, no gating, no buffer dropping.
+/// - **Path 2 (UI):** The preprocessed `audioLevelStream` path is currently disabled
+///   (waveform is driven by `AudioMeterCollector` from `ChunkedAudioRecorder`).
+///
 /// The 60-second SFSpeechRecognizer limit is handled by restarting the recognition task
-/// at 55 seconds, synchronized with chunk rotation.
+/// at 55 seconds while keeping the audio engine running continuously.
 @MainActor
 final class LiveTranscriber: ObservableObject {
 
@@ -28,13 +51,16 @@ final class LiveTranscriber: ObservableObject {
 
     // MARK: - Private
 
-    private let audioEngine = AVAudioEngine()
+    private var audioEngineManager: AudioEngineManager?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var speechRecognizer: SFSpeechRecognizer?
     private var restartTimer: Timer?
     private var currentLocale: Locale = .current
     private var nextCycleIndex: Int = 0
+
+    /// Thread-safe holder used by the audio render callback to append buffers.
+    private let activeRequestHolder = ActiveRequestHolder()
 
     // MARK: - Lifecycle
 
@@ -58,9 +84,24 @@ final class LiveTranscriber: ObservableObject {
         }
 
         do {
+            // Start audio engine (session already configured by RecordingCoordinator)
+            let holder = activeRequestHolder
+            let manager = AudioEngineManager(
+                // Pod-2 decision: keep waveform driven by AudioMeterCollector and
+                // disable the unused audioLevelStream preprocessing path.
+                uiLevelPolicy: .disabled,
+                rawBufferHandler: { buffer in
+                    holder.appendBuffer(buffer)
+                }
+            )
+            try manager.start()
+            self.audioEngineManager = manager
+
+            // Start speech recognition
             try startRecognition(recognizer: recognizer)
             state = .listening
         } catch {
+            stopEngine()
             state = .error(
                 "Failed to start live transcription: \(error.localizedDescription)"
             )
@@ -68,7 +109,8 @@ final class LiveTranscriber: ObservableObject {
     }
 
     func stop() {
-        stopRecognition()
+        stopRecognitionOnly()
+        stopEngine()
         state = .idle
         partialText = ""
         // confirmedSegments are cleared separately via reset() after coordinator cleanup
@@ -83,7 +125,8 @@ final class LiveTranscriber: ObservableObject {
 
     func pause() {
         guard state == .listening else { return }
-        stopRecognition()
+        stopRecognitionOnly()
+        stopEngine()
         state = .paused
     }
 
@@ -94,9 +137,21 @@ final class LiveTranscriber: ObservableObject {
             return
         }
         do {
+            let holder = activeRequestHolder
+            let manager = AudioEngineManager(
+                // Keep the same policy on resume to avoid extra CPU on the
+                // currently unused UI preprocessing path.
+                uiLevelPolicy: .disabled,
+                rawBufferHandler: { buffer in
+                    holder.appendBuffer(buffer)
+                }
+            )
+            try manager.start()
+            self.audioEngineManager = manager
             try startRecognition(recognizer: recognizer)
             state = .listening
         } catch {
+            stopEngine()
             state = .error("Failed to resume: \(error.localizedDescription)")
         }
     }
@@ -117,12 +172,13 @@ final class LiveTranscriber: ObservableObject {
         }
     }
 
-    // MARK: - Private
+    // MARK: - Recognition
 
     private func startRecognition(recognizer: SFSpeechRecognizer) throws {
-        // Cancel any existing
+        // Cancel any existing recognition task
         recognitionTask?.cancel()
         recognitionRequest = nil
+        activeRequestHolder.set(nil)
 
         let mode = RecognitionMode.load()
         let request = SFSpeechAudioBufferRecognitionRequest()
@@ -145,23 +201,7 @@ final class LiveTranscriber: ObservableObject {
         }
 
         recognitionRequest = request
-
-        let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-
-        // Remove existing tap if any
-        inputNode.removeTap(onBus: 0)
-
-        inputNode.installTap(
-            onBus: 0,
-            bufferSize: 1024,
-            format: recordingFormat
-        ) { [weak request] buffer, _ in
-            request?.append(buffer)
-        }
-
-        audioEngine.prepare()
-        try audioEngine.start()
+        activeRequestHolder.set(request)
 
         let currentCycle = nextCycleIndex
 
@@ -228,7 +268,9 @@ final class LiveTranscriber: ObservableObject {
         }
 
         nextCycleIndex += 1
-        stopRecognition()
+
+        // Stop only the recognition task — audio engine keeps running
+        stopRecognitionOnly()
 
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {
             state = .error("Recognizer unavailable after restart")
@@ -244,17 +286,21 @@ final class LiveTranscriber: ObservableObject {
         }
     }
 
-    private func stopRecognition() {
+    /// Stops recognition task and request without touching the audio engine.
+    /// Used during the 55-second restart cycle to keep audio flowing.
+    private func stopRecognitionOnly() {
         restartTimer?.invalidate()
         restartTimer = nil
         recognitionTask?.cancel()
         recognitionTask = nil
         recognitionRequest?.endAudio()
         recognitionRequest = nil
+        activeRequestHolder.set(nil)
+    }
 
-        audioEngine.inputNode.removeTap(onBus: 0)
-        if audioEngine.isRunning {
-            audioEngine.stop()
-        }
+    /// Stops the audio engine.
+    private func stopEngine() {
+        audioEngineManager?.stop()
+        audioEngineManager = nil
     }
 }

@@ -1,9 +1,11 @@
 import Foundation
 import CoreData
+import os.log
 
 final class CoreDataStack {
 
     let container: NSPersistentContainer
+    private let logger = Logger(subsystem: "com.lifememo.app", category: "CoreData")
 
     var viewContext: NSManagedObjectContext {
         container.viewContext
@@ -132,7 +134,7 @@ final class CoreDataStack {
         do {
             try context.save()
         } catch {
-            print("CoreData save error: \(error.localizedDescription)")
+            logger.error("CoreData save error: \(error.localizedDescription, privacy: .public)")
         }
     }
 
