@@ -58,6 +58,7 @@ final class LiveTranscriber: ObservableObject {
     private var restartTimer: Timer?
     private var currentLocale: Locale = .current
     private var nextCycleIndex: Int = 0
+    private var lastPartialUpdateAt: Date?
 
     /// Thread-safe holder used by the audio render callback to append buffers.
     private let activeRequestHolder = ActiveRequestHolder()
@@ -68,7 +69,9 @@ final class LiveTranscriber: ObservableObject {
         currentLocale = locale
         speechRecognizer = SFSpeechRecognizer(locale: locale)
         confirmedSegments = []
+        partialText = ""
         nextCycleIndex = 0
+        lastPartialUpdateAt = nil
 
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {
             state = .error("Speech recognition not available")
@@ -109,10 +112,12 @@ final class LiveTranscriber: ObservableObject {
     }
 
     func stop() {
+        appendConfirmedSegmentIfNeeded(partialText, cycleIndex: nextCycleIndex)
         stopRecognitionOnly()
         stopEngine()
         state = .idle
         partialText = ""
+        lastPartialUpdateAt = nil
         // confirmedSegments are cleared separately via reset() after coordinator cleanup
     }
 
@@ -121,10 +126,14 @@ final class LiveTranscriber: ObservableObject {
     func reset() {
         confirmedSegments = []
         nextCycleIndex = 0
+        lastPartialUpdateAt = nil
     }
 
     func pause() {
         guard state == .listening else { return }
+        appendConfirmedSegmentIfNeeded(partialText, cycleIndex: nextCycleIndex)
+        partialText = ""
+        lastPartialUpdateAt = nil
         stopRecognitionOnly()
         stopEngine()
         state = .paused
@@ -212,20 +221,33 @@ final class LiveTranscriber: ObservableObject {
                 guard let self else { return }
 
                 if let result {
-                    self.partialText = result.bestTranscription.formattedString
+                    let newPartial = result.bestTranscription.formattedString
+                    let now = Date()
+                    let silenceGapSec = self.lastPartialUpdateAt.map {
+                        now.timeIntervalSince($0)
+                    }
+
+                    if Self.shouldCommitPreviousPartial(
+                        previousPartial: self.partialText,
+                        newPartial: newPartial,
+                        silenceGapSec: silenceGapSec
+                    ) {
+                        self.appendConfirmedSegmentIfNeeded(
+                            self.partialText,
+                            cycleIndex: currentCycle
+                        )
+                    }
+                    self.partialText = newPartial
+                    self.lastPartialUpdateAt = now
 
                     if result.isFinal {
                         let finalText = result.bestTranscription.formattedString
-                        if !finalText.isEmpty {
-                            let segment = LiveSegment(
-                                id: UUID(),
-                                text: finalText,
-                                confirmedAt: Date(),
-                                cycleIndex: currentCycle
-                            )
-                            self.confirmedSegments.append(segment)
-                        }
+                        self.appendConfirmedSegmentIfNeeded(
+                            finalText,
+                            cycleIndex: currentCycle
+                        )
                         self.partialText = ""
+                        self.lastPartialUpdateAt = nil
                     }
                 }
 
@@ -256,16 +278,9 @@ final class LiveTranscriber: ObservableObject {
         guard state == .listening else { return }
 
         // Save current partial as confirmed segment
-        if !partialText.isEmpty {
-            let segment = LiveSegment(
-                id: UUID(),
-                text: partialText,
-                confirmedAt: Date(),
-                cycleIndex: nextCycleIndex
-            )
-            confirmedSegments.append(segment)
-            partialText = ""
-        }
+        appendConfirmedSegmentIfNeeded(partialText, cycleIndex: nextCycleIndex)
+        partialText = ""
+        lastPartialUpdateAt = nil
 
         nextCycleIndex += 1
 
@@ -302,5 +317,120 @@ final class LiveTranscriber: ObservableObject {
     private func stopEngine() {
         audioEngineManager?.stop()
         audioEngineManager = nil
+    }
+
+    private func appendConfirmedSegmentIfNeeded(
+        _ rawText: String,
+        cycleIndex: Int
+    ) {
+        let text = Self.normalizeText(rawText)
+        guard !text.isEmpty else { return }
+        if isDuplicateOfRecentConfirmed(text) { return }
+
+        let segment = LiveSegment(
+            id: UUID(),
+            text: text,
+            confirmedAt: Date(),
+            cycleIndex: cycleIndex
+        )
+        confirmedSegments.append(segment)
+    }
+
+    private func isDuplicateOfRecentConfirmed(_ text: String) -> Bool {
+        guard let last = confirmedSegments.last else { return false }
+        let lastText = Self.normalizeText(last.text)
+        if lastText == text { return true }
+
+        // Avoid near-duplicate segments caused by partial->final transitions.
+        if text.hasPrefix(lastText) || lastText.hasPrefix(text) {
+            let lengthDiff = abs(text.count - lastText.count)
+            return lengthDiff <= 4
+        }
+        return false
+    }
+
+    nonisolated static func shouldCommitPreviousPartial(
+        previousPartial: String,
+        newPartial: String
+    ) -> Bool {
+        shouldCommitPreviousPartial(
+            previousPartial: previousPartial,
+            newPartial: newPartial,
+            silenceGapSec: nil
+        )
+    }
+
+    nonisolated static func shouldCommitPreviousPartial(
+        previousPartial: String,
+        newPartial: String,
+        silenceGapSec: TimeInterval?
+    ) -> Bool {
+        let previous = normalizeText(previousPartial)
+        let incoming = normalizeText(newPartial)
+
+        guard !previous.isEmpty, !incoming.isEmpty else { return false }
+        guard previous != incoming else { return false }
+
+        if incoming.hasPrefix(previous) {
+            // Normal growth ("hello" -> "hello world")
+            return false
+        }
+
+        let commonPrefixLen = commonPrefixLength(previous, incoming)
+        let previousCount = previous.count
+        let incomingCount = incoming.count
+        let shrinkChars = max(0, previousCount - incomingCount)
+
+        // If recognizer restarts an utterance and drops most of previous partial,
+        // commit the previous partial before replacing.
+        if commonPrefixLen == 0, previousCount >= 6 {
+            return true
+        }
+
+        if previous.hasPrefix(incoming) {
+            // Strong rollback of the active hypothesis should not erase text from UI.
+            if shrinkChars >= 10 {
+                return true
+            }
+            if let silenceGapSec, silenceGapSec >= 1.2, shrinkChars >= 4 {
+                return true
+            }
+        }
+
+        let commonRatio = Double(commonPrefixLen) / Double(max(1, previousCount))
+        let shrinkRatio = Double(incomingCount) / Double(max(1, previousCount))
+        if let silenceGapSec,
+           silenceGapSec >= 1.2,
+           commonRatio < 0.60,
+           shrinkRatio < 0.95,
+           previousCount >= 8 {
+            return true
+        }
+        if commonRatio < 0.35, shrinkRatio < 0.85, previousCount >= 8 {
+            return true
+        }
+
+        return false
+    }
+
+    nonisolated private static func normalizeText(_ text: String) -> String {
+        text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+
+    nonisolated private static func commonPrefixLength(_ lhs: String, _ rhs: String) -> Int {
+        let lhsChars = Array(lhs)
+        let rhsChars = Array(rhs)
+        let maxLen = min(lhsChars.count, rhsChars.count)
+
+        var idx = 0
+        while idx < maxLen {
+            if lhsChars[idx] != rhsChars[idx] {
+                break
+            }
+            idx += 1
+        }
+        return idx
     }
 }

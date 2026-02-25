@@ -134,6 +134,9 @@ actor TranscriptionQueueActor {
         let locale: Locale = await MainActor.run {
             repository.getLocaleForSession(sessionId: sessionId)
         }
+        let chunkDurationSec: Double = await MainActor.run {
+            repository.getChunkDurationSec(chunkId: chunkId)
+        }
 
         do {
             let detail = try await transcriber.transcribeFileWithSegments(
@@ -146,8 +149,26 @@ actor TranscriptionQueueActor {
                 wordSegments: detail.wordSegments
             )
 
+            logger.info(
+                "Chunk \(chunkId.uuidString, privacy: .public) recognized textLen=\(detail.diagnostics.textLength, privacy: .public) wordCount=\(detail.diagnostics.wordCount, privacy: .public) firstWordMs=\(detail.diagnostics.firstWordStartMs ?? -1, privacy: .public) lastWordMs=\(detail.diagnostics.lastWordEndMs ?? -1, privacy: .public)"
+            )
+
+            let evaluation = TranscriptionCompletenessEvaluator.evaluate(
+                fullText: detail.formattedString,
+                wordSegments: detail.wordSegments,
+                diarizedSegments: diarization.segments,
+                chunkDurationSec: chunkDurationSec
+            )
+            let useDiarizedPersistence = diarization.speakerCount > 1 && !evaluation.shouldFallbackToFullText
+
+            if evaluation.isSuspectTruncation {
+                logger.warning(
+                    "Diarization completeness warning chunk \(chunkId.uuidString, privacy: .public) reason=\(evaluation.reason ?? "unknown", privacy: .public) fullLen=\(evaluation.fullTextLength, privacy: .public) diarizedLen=\(evaluation.diarizedTextLength, privacy: .public) wordSpanMs=\(evaluation.wordSpanMs ?? -1, privacy: .public) diarizedSpanMs=\(evaluation.diarizedSpanMs ?? -1, privacy: .public)"
+                )
+            }
+
             await MainActor.run {
-                if diarization.speakerCount > 1 {
+                if useDiarizedPersistence {
                     repository.saveTranscriptWithSpeakers(
                         sessionId: sessionId,
                         chunkId: chunkId,
@@ -164,7 +185,7 @@ actor TranscriptionQueueActor {
                         )
                     }
                 } else {
-                    // Single speaker or no diarization → use original path
+                    // Single-speaker path or defensive fallback to prevent truncation.
                     repository.saveTranscript(
                         sessionId: sessionId,
                         chunkId: chunkId,

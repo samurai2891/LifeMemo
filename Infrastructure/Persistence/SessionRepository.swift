@@ -116,6 +116,11 @@ final class SessionRepository {
         return fileStore.resolveAbsoluteURL(relativePath: path)
     }
 
+    func getChunkDurationSec(chunkId: UUID) -> Double {
+        guard let chunk = fetchChunk(id: chunkId) else { return 0 }
+        return chunk.durationSec
+    }
+
     // MARK: - Transcription
 
     func saveTranscript(sessionId: UUID, chunkId: UUID, text: String) {
@@ -154,6 +159,26 @@ final class SessionRepository {
     ) {
         guard let session = fetchSession(id: sessionId),
               let chunk = fetchChunk(id: chunkId) else { return }
+
+        let normalizedFullText = normalizeTranscriptText(fullText)
+        let normalizedDiarizedText = normalizeTranscriptText(
+            diarization.segments.map(\.text).joined(separator: " ")
+        )
+
+        if shouldFallbackToFullText(
+            fullText: normalizedFullText,
+            diarizedText: normalizedDiarizedText
+        ) {
+            logger.warning(
+                "Fallback to full transcript for chunk \(chunkId.uuidString, privacy: .public) fullLen=\(normalizedFullText.count, privacy: .public) diarizedLen=\(normalizedDiarizedText.count, privacy: .public)"
+            )
+            saveTranscript(
+                sessionId: sessionId,
+                chunkId: chunkId,
+                text: fullText
+            )
+            return
+        }
 
         let chunkStartAt = chunk.startAt ?? Date()
         let sessionStartedAt = session.startedAt ?? Date()
@@ -956,6 +981,28 @@ final class SessionRepository {
     }
 
     // MARK: - Private Helpers
+
+    private func normalizeTranscriptText(_ text: String) -> String {
+        text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+
+    /// Defensive fallback to avoid persisting truncated diarization output.
+    private func shouldFallbackToFullText(fullText: String, diarizedText: String) -> Bool {
+        guard !fullText.isEmpty else { return false }
+        guard !diarizedText.isEmpty else { return true }
+
+        let minLengthForRatioCheck = 20
+        let minShortfallChars = 12
+        let minDiarizedRatio = 0.55
+
+        guard fullText.count >= minLengthForRatioCheck else { return false }
+
+        let shortfall = fullText.count - diarizedText.count
+        let ratio = Double(diarizedText.count) / Double(max(1, fullText.count))
+        return shortfall >= minShortfallChars && ratio < minDiarizedRatio
+    }
 
     private func fetchSegment(id: UUID) -> TranscriptSegmentEntity? {
         let request = NSFetchRequest<TranscriptSegmentEntity>(entityName: "TranscriptSegmentEntity")

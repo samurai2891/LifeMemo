@@ -29,4 +29,7 @@ xcodebuild \
   test \
   -only-testing:LifeMemoTests/AHCClustererTests \
   -only-testing:LifeMemoTests/SessionFinalizationStatusTests \
-  -only-testing:LifeMemoTests/RecognitionModeTests
+  -only-testing:LifeMemoTests/RecognitionModeTests \
+  -only-testing:LifeMemoTests/LiveTranscriberPartialRolloverTests \
+  -only-testing:LifeMemoTests/TranscriptionCompletenessEvaluatorTests \
+  -only-testing:LifeMemoTests/SessionRepositoryDiarizationFallbackTests
