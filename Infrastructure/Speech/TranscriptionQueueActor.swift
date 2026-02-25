@@ -150,7 +150,7 @@ actor TranscriptionQueueActor {
             )
 
             logger.info(
-                "Chunk \(chunkId.uuidString, privacy: .public) recognized textLen=\(detail.diagnostics.textLength, privacy: .public) wordCount=\(detail.diagnostics.wordCount, privacy: .public) firstWordMs=\(detail.diagnostics.firstWordStartMs ?? -1, privacy: .public) lastWordMs=\(detail.diagnostics.lastWordEndMs ?? -1, privacy: .public)"
+                "Chunk \(chunkId.uuidString, privacy: .public) recognized source=\(detail.diagnostics.textSource.rawValue, privacy: .public) textLen=\(detail.diagnostics.textLength, privacy: .public) wordCount=\(detail.diagnostics.wordCount, privacy: .public) firstWordMs=\(detail.diagnostics.firstWordStartMs ?? -1, privacy: .public) lastWordMs=\(detail.diagnostics.lastWordEndMs ?? -1, privacy: .public) conflictRate=\(detail.diagnostics.conflictWordRate, privacy: .public) alignment=\(detail.diagnostics.alignmentScore, privacy: .public)"
             )
 
             let evaluation = TranscriptionCompletenessEvaluator.evaluate(

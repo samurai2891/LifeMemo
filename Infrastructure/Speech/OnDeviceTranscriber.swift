@@ -7,22 +7,51 @@ struct TranscriptionDetail {
     let formattedString: String
     let wordSegments: [WordSegmentInfo]
     let diagnostics: TranscriptionDiagnostics
+    let selectedTextSource: TranscriptionTextSource
+    let qualitySignals: TranscriptionQualitySignals
 
     init(
         formattedString: String,
         wordSegments: [WordSegmentInfo],
-        diagnostics: TranscriptionDiagnostics? = nil
+        diagnostics: TranscriptionDiagnostics? = nil,
+        selectedTextSource: TranscriptionTextSource = .primaryFinal,
+        qualitySignals: TranscriptionQualitySignals? = nil
     ) {
         self.formattedString = formattedString
         self.wordSegments = wordSegments
+        self.selectedTextSource = selectedTextSource
+        self.qualitySignals = qualitySignals ?? TranscriptionQualitySignals(
+            primaryCoverage: 1.0,
+            alignmentScore: 1.0,
+            conflictWordRate: 0.0,
+            primaryWordCount: wordSegments.count,
+            consensusWordCount: wordSegments.count
+        )
         self.diagnostics = diagnostics ?? TranscriptionDiagnostics(
             textLength: formattedString.count,
             wordCount: wordSegments.count,
             firstWordStartMs: wordSegments.first.map { Int64($0.timestamp * 1000) },
             lastWordEndMs: wordSegments.last.map { Int64(($0.timestamp + $0.duration) * 1000) },
-            recognitionDurationMs: 0
+            recognitionDurationMs: 0,
+            textSource: selectedTextSource,
+            fallbackReason: nil,
+            conflictWordRate: self.qualitySignals.conflictWordRate,
+            alignmentScore: self.qualitySignals.alignmentScore
         )
     }
+}
+
+enum TranscriptionTextSource: String {
+    case primaryFinal
+    case consensusFallback
+}
+
+struct TranscriptionQualitySignals {
+    let primaryCoverage: Double
+    let alignmentScore: Double
+    let conflictWordRate: Double
+    let primaryWordCount: Int
+    let consensusWordCount: Int
 }
 
 /// Diagnostics captured from one URL-based recognition request.
@@ -32,6 +61,10 @@ struct TranscriptionDiagnostics {
     let firstWordStartMs: Int64?
     let lastWordEndMs: Int64?
     let recognitionDurationMs: Int64
+    let textSource: TranscriptionTextSource
+    let fallbackReason: String?
+    let conflictWordRate: Double
+    let alignmentScore: Double
 }
 
 /// On-device speech transcription using Apple's Speech framework.
@@ -129,6 +162,7 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
         var continuation: CheckedContinuation<TranscriptionDetail, Error>?
         var hasCompleted = false
         var mergedSegments: [MergedWordKey: WordSegmentInfo] = [:]
+        var mergedConflictTexts: [MergedWordKey: Set<String>] = [:]
 
         return try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { (cont: CheckedContinuation<TranscriptionDetail, Error>) in
@@ -163,23 +197,35 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
 
                         Self.mergeSegments(
                             from: result.bestTranscription.segments,
-                            into: &mergedSegments
+                            into: &mergedSegments,
+                            conflictTexts: &mergedConflictTexts
                         )
 
                         guard result.isFinal else { return }
 
                         let transcription = result.bestTranscription
-                        let wordSegments = Self.sortedMergedSegments(mergedSegments)
-                        let mergedText = wordSegments.map(\.substring).joined(separator: " ")
-                        let resolvedText = Self.resolveFormattedString(
-                            primary: transcription.formattedString,
-                            mergedFallback: mergedText
+                        let primaryWordSegments = transcription.segments.map(Self.mapSegmentToWordInfo)
+                        let consensusWordSegments = Self.sortedMergedSegments(mergedSegments)
+                        let consensusText = consensusWordSegments.map(\.substring).joined(separator: " ")
+                        let conflictWordRate = Self.computeConflictWordRate(
+                            conflictTexts: mergedConflictTexts
+                        )
+
+                        let resolved = Self.resolveFinalResultForTesting(
+                            primaryText: transcription.formattedString,
+                            primaryWordSegments: primaryWordSegments,
+                            consensusText: consensusText,
+                            consensusWordSegments: consensusWordSegments,
+                            conflictWordRate: conflictWordRate
                         )
 
                         let diagnostics = Self.makeDiagnostics(
-                            formattedString: resolvedText,
-                            wordSegments: wordSegments,
-                            startedAt: startedAt
+                            formattedString: resolved.text,
+                            wordSegments: resolved.segments,
+                            startedAt: startedAt,
+                            textSource: resolved.source,
+                            fallbackReason: resolved.reason,
+                            qualitySignals: resolved.signals
                         )
 
                         hasCompleted = true
@@ -188,16 +234,22 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
                         self?.setActiveRecognitionTask(nil)
                         completionResult = .success(
                             TranscriptionDetail(
-                                formattedString: resolvedText,
-                                wordSegments: wordSegments,
-                                diagnostics: diagnostics
+                                formattedString: resolved.text,
+                                wordSegments: resolved.segments,
+                                diagnostics: diagnostics,
+                                selectedTextSource: resolved.source,
+                                qualitySignals: resolved.signals
                             )
                         )
 
-                        if Self.normalizeText(resolvedText).count
+                        if resolved.source == .consensusFallback {
+                            self?.logger.warning(
+                                "Using consensus fallback text due to primary truncation primaryLen=\(transcription.formattedString.count, privacy: .public) consensusLen=\(consensusText.count, privacy: .public) conflictRate=\(resolved.signals.conflictWordRate, privacy: .public) alignment=\(resolved.signals.alignmentScore, privacy: .public) reason=\(resolved.reason ?? "none", privacy: .public)"
+                            )
+                        } else if Self.normalizeText(consensusText).count
                             > Self.normalizeText(transcription.formattedString).count + 8 {
                             self?.logger.warning(
-                                "Using merged URL transcription text due to possible truncation primaryLen=\(transcription.formattedString.count, privacy: .public) mergedLen=\(resolvedText.count, privacy: .public)"
+                                "Rejected consensus fallback to protect precision primaryLen=\(transcription.formattedString.count, privacy: .public) consensusLen=\(consensusText.count, privacy: .public) conflictRate=\(resolved.signals.conflictWordRate, privacy: .public) alignment=\(resolved.signals.alignmentScore, privacy: .public)"
                             )
                         }
 
@@ -303,7 +355,10 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
     private static func makeDiagnostics(
         formattedString: String,
         wordSegments: [WordSegmentInfo],
-        startedAt: Date
+        startedAt: Date,
+        textSource: TranscriptionTextSource,
+        fallbackReason: String?,
+        qualitySignals: TranscriptionQualitySignals
     ) -> TranscriptionDiagnostics {
         let firstWordStartMs = wordSegments.min { $0.timestamp < $1.timestamp }.map {
             Int64($0.timestamp * 1000)
@@ -319,24 +374,30 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
             wordCount: wordSegments.count,
             firstWordStartMs: firstWordStartMs,
             lastWordEndMs: lastWordEndMs,
-            recognitionDurationMs: Int64(Date().timeIntervalSince(startedAt) * 1000)
+            recognitionDurationMs: Int64(Date().timeIntervalSince(startedAt) * 1000),
+            textSource: textSource,
+            fallbackReason: fallbackReason,
+            conflictWordRate: qualitySignals.conflictWordRate,
+            alignmentScore: qualitySignals.alignmentScore
         )
     }
 
     private struct MergedWordKey: Hashable {
         let startBucketMs: Int64
         let durationBucketMs: Int64
-        let substring: String
     }
 
     private static func mergeSegments(
         from segments: [SFTranscriptionSegment],
-        into merged: inout [MergedWordKey: WordSegmentInfo]
+        into merged: inout [MergedWordKey: WordSegmentInfo],
+        conflictTexts: inout [MergedWordKey: Set<String>]
     ) {
         for seg in segments {
-            if normalizeText(seg.substring).isEmpty { continue }
+            let normalizedText = normalizeText(seg.substring)
+            if normalizedText.isEmpty { continue }
             let key = makeMergedWordKey(seg)
             let mapped = mapSegmentToWordInfo(seg)
+            conflictTexts[key, default: []].insert(normalizedText)
             if let existing = merged[key] {
                 if mapped.confidence >= existing.confidence {
                     merged[key] = mapped
@@ -353,11 +414,9 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
         let durationMs = segment.duration * 1000
         let startBucket = Int64((startMs / bucketMs).rounded() * bucketMs)
         let durationBucket = Int64((durationMs / bucketMs).rounded() * bucketMs)
-        let text = normalizeText(segment.substring)
         return MergedWordKey(
             startBucketMs: startBucket,
-            durationBucketMs: max(100, durationBucket),
-            substring: text
+            durationBucketMs: max(100, durationBucket)
         )
     }
 
@@ -372,24 +431,143 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
         }
     }
 
-    private static func resolveFormattedString(
-        primary: String,
-        mergedFallback: String
-    ) -> String {
-        let normalizedPrimary = normalizeText(primary)
-        let normalizedMerged = normalizeText(mergedFallback)
+    private static func computeConflictWordRate(
+        conflictTexts: [MergedWordKey: Set<String>]
+    ) -> Double {
+        guard !conflictTexts.isEmpty else { return 0 }
+        let conflicting = conflictTexts.values.reduce(0) { count, set in
+            count + (set.count > 1 ? 1 : 0)
+        }
+        return Double(conflicting) / Double(conflictTexts.count)
+    }
 
-        guard !normalizedPrimary.isEmpty else { return mergedFallback }
-        guard !normalizedMerged.isEmpty else { return primary }
+    static func resolveFinalResultForTesting(
+        primaryText: String,
+        primaryWordSegments: [WordSegmentInfo],
+        consensusText: String,
+        consensusWordSegments: [WordSegmentInfo],
+        conflictWordRate: Double
+    ) -> (
+        text: String,
+        segments: [WordSegmentInfo],
+        source: TranscriptionTextSource,
+        signals: TranscriptionQualitySignals,
+        reason: String?
+    ) {
+        let normalizedPrimary = normalizeText(primaryText)
+        let normalizedConsensus = normalizeText(consensusText)
 
         let primaryLen = normalizedPrimary.count
-        let mergedLen = normalizedMerged.count
-        let primaryCoverage = Double(primaryLen) / Double(max(1, mergedLen))
+        let consensusLen = normalizedConsensus.count
+        let primaryCoverage = consensusLen == 0 ? 1.0 : Double(primaryLen) / Double(consensusLen)
+        let alignmentScore = diceCoefficient(normalizedPrimary, normalizedConsensus)
+        let signals = TranscriptionQualitySignals(
+            primaryCoverage: primaryCoverage,
+            alignmentScore: alignmentScore,
+            conflictWordRate: conflictWordRate,
+            primaryWordCount: primaryWordSegments.count,
+            consensusWordCount: consensusWordSegments.count
+        )
 
-        if mergedLen >= 10, primaryCoverage < 0.70 {
-            return mergedFallback
+        guard !normalizedPrimary.isEmpty else {
+            if !normalizedConsensus.isEmpty {
+                return (
+                    text: consensusText,
+                    segments: consensusWordSegments,
+                    source: .consensusFallback,
+                    signals: signals,
+                    reason: "primary_empty"
+                )
+            }
+            return (
+                text: primaryText,
+                segments: primaryWordSegments,
+                source: .primaryFinal,
+                signals: signals,
+                reason: nil
+            )
         }
-        return primary
+
+        guard !normalizedConsensus.isEmpty else {
+            return (
+                text: primaryText,
+                segments: primaryWordSegments,
+                source: .primaryFinal,
+                signals: signals,
+                reason: nil
+            )
+        }
+
+        if shouldUseConsensusFallback(
+            signals: signals,
+            primaryLength: primaryLen,
+            consensusLength: consensusLen
+        ) {
+            return (
+                text: consensusText,
+                segments: consensusWordSegments,
+                source: .consensusFallback,
+                signals: signals,
+                reason: "primary_truncation_high_alignment_low_conflict"
+            )
+        }
+        return (
+            text: primaryText,
+            segments: primaryWordSegments,
+            source: .primaryFinal,
+            signals: signals,
+            reason: nil
+        )
+    }
+
+    private static func shouldUseConsensusFallback(
+        signals: TranscriptionQualitySignals,
+        primaryLength: Int,
+        consensusLength: Int
+    ) -> Bool {
+        guard consensusLength >= 12 else { return false }
+        guard consensusLength > primaryLength else { return false }
+        guard signals.consensusWordCount >= signals.primaryWordCount else { return false }
+        guard signals.primaryCoverage < 0.45 else { return false }
+        guard signals.alignmentScore >= 0.88 else { return false }
+        guard signals.conflictWordRate <= 0.08 else { return false }
+        return true
+    }
+
+    private static func diceCoefficient(_ lhs: String, _ rhs: String) -> Double {
+        if lhs == rhs { return 1.0 }
+        guard !lhs.isEmpty, !rhs.isEmpty else { return 0.0 }
+
+        let lhsGrams = bigrams(lhs)
+        let rhsGrams = bigrams(rhs)
+        guard !lhsGrams.isEmpty, !rhsGrams.isEmpty else {
+            return lhs == rhs ? 1.0 : 0.0
+        }
+
+        var rhsCounts: [String: Int] = [:]
+        for gram in rhsGrams {
+            rhsCounts[gram, default: 0] += 1
+        }
+
+        var intersection = 0
+        for gram in lhsGrams {
+            guard let count = rhsCounts[gram], count > 0 else { continue }
+            intersection += 1
+            rhsCounts[gram] = count - 1
+        }
+
+        return (2.0 * Double(intersection)) / Double(lhsGrams.count + rhsGrams.count)
+    }
+
+    private static func bigrams(_ text: String) -> [String] {
+        let chars = Array(text)
+        guard chars.count >= 2 else { return [] }
+        var grams: [String] = []
+        grams.reserveCapacity(chars.count - 1)
+        for idx in 0..<(chars.count - 1) {
+            grams.append(String([chars[idx], chars[idx + 1]]))
+        }
+        return grams
     }
 
     private static func normalizeText(_ text: String) -> String {

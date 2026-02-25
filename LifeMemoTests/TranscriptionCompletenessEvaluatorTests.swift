@@ -138,3 +138,94 @@ final class TranscriptionCompletenessEvaluatorTests: XCTestCase {
         )
     }
 }
+
+final class OnDeviceTranscriberFinalSelectionTests: XCTestCase {
+
+    func testConflictHeavyConsensusDoesNotOverridePrimary() {
+        let primary = "今日は会議を開始します"
+        let primarySegments = [
+            makeWord(text: "今日は", start: 0.0),
+            makeWord(text: "会議を", start: 0.4),
+            makeWord(text: "開始します", start: 0.8),
+        ]
+        let consensus = "今日は 今日 会議を 景気 開始します"
+        let consensusSegments = [
+            makeWord(text: "今日は", start: 0.0),
+            makeWord(text: "今日", start: 0.0),
+            makeWord(text: "会議を", start: 0.4),
+            makeWord(text: "景気", start: 0.4),
+            makeWord(text: "開始します", start: 0.8),
+        ]
+
+        let resolved = OnDeviceTranscriber.resolveFinalResultForTesting(
+            primaryText: primary,
+            primaryWordSegments: primarySegments,
+            consensusText: consensus,
+            consensusWordSegments: consensusSegments,
+            conflictWordRate: 0.40
+        )
+
+        XCTAssertEqual(resolved.source, .primaryFinal)
+        XCTAssertEqual(resolved.text, primary)
+        XCTAssertEqual(resolved.segments.map(\.substring), primarySegments.map(\.substring))
+    }
+
+    func testPrimaryEmptyUsesConsensusFallback() {
+        let consensus = "議事録を作成します"
+        let consensusSegments = [
+            makeWord(text: "議事録を", start: 0.0),
+            makeWord(text: "作成します", start: 0.5),
+        ]
+
+        let resolved = OnDeviceTranscriber.resolveFinalResultForTesting(
+            primaryText: "",
+            primaryWordSegments: [],
+            consensusText: consensus,
+            consensusWordSegments: consensusSegments,
+            conflictWordRate: 0.0
+        )
+
+        XCTAssertEqual(resolved.source, .consensusFallback)
+        XCTAssertEqual(resolved.text, consensus)
+        XCTAssertEqual(resolved.segments.map(\.substring), consensusSegments.map(\.substring))
+    }
+
+    func testLowCoverageConsensusStillKeepsPrimaryWhenAlignmentIsInsufficient() {
+        let primary = "本日の議題"
+        let primarySegments = [
+            makeWord(text: "本日の", start: 0.0),
+            makeWord(text: "議題を", start: 0.4),
+        ]
+        let consensus = "本日の議題を確認します では進めます 次の項目です"
+        let consensusSegments = [
+            makeWord(text: "本日の", start: 0.0),
+            makeWord(text: "議題を", start: 0.4),
+            makeWord(text: "確認します", start: 0.8),
+            makeWord(text: "では", start: 1.2),
+            makeWord(text: "進めます", start: 1.5),
+            makeWord(text: "次の", start: 1.9),
+            makeWord(text: "項目です", start: 2.2),
+        ]
+
+        let resolved = OnDeviceTranscriber.resolveFinalResultForTesting(
+            primaryText: primary,
+            primaryWordSegments: primarySegments,
+            consensusText: consensus,
+            consensusWordSegments: consensusSegments,
+            conflictWordRate: 0.0
+        )
+
+        XCTAssertEqual(resolved.source, .primaryFinal)
+        XCTAssertEqual(resolved.text, primary)
+    }
+
+    private func makeWord(text: String, start: Double) -> WordSegmentInfo {
+        WordSegmentInfo(
+            substring: text,
+            timestamp: start,
+            duration: 0.3,
+            confidence: 0.95,
+            averagePitch: nil
+        )
+    }
+}
