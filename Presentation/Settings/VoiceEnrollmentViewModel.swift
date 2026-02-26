@@ -126,7 +126,12 @@ final class VoiceEnrollmentViewModel: ObservableObject {
             ]
             let recorder = try AVAudioRecorder(url: recordingURL, settings: settings)
             recorder.isMeteringEnabled = false
-            recorder.record()
+            guard recorder.record() else {
+                audioSession.deactivate()
+                try? FileManager.default.removeItem(at: recordingURL)
+                errorMessage = "録音開始に失敗しました。マイク設定を確認して再試行してください。"
+                return
+            }
 
             self.recorder = recorder
             self.currentRecordingURL = recordingURL
@@ -155,6 +160,7 @@ final class VoiceEnrollmentViewModel: ObservableObject {
 
     private func finishRecording() async {
         guard isRecording else { return }
+        let recordedDurationSec = recorder?.currentTime ?? 0
         stopRecorderOnly()
 
         guard let promptId = currentPromptId, let recordingURL = currentRecordingURL else {
@@ -166,6 +172,14 @@ final class VoiceEnrollmentViewModel: ObservableObject {
         defer {
             try? FileManager.default.removeItem(at: recordingURL)
             cleanupRecordingState()
+        }
+
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        guard recordedDurationSec > 0,
+              let fileSize = Self.fileSizeBytes(at: recordingURL),
+              fileSize > 0 else {
+            errorMessage = VoiceEnrollmentError.emptyOrUnflushedFile.localizedDescription
+            return
         }
 
         do {
@@ -216,5 +230,13 @@ final class VoiceEnrollmentViewModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: 100_000_000)
             }
         }
+    }
+
+    private static func fileSizeBytes(at url: URL) -> Int64? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let fileSize = attributes[.size] as? NSNumber else {
+            return nil
+        }
+        return fileSize.int64Value
     }
 }

@@ -1,6 +1,7 @@
 import Accelerate
 import AVFoundation
 import Foundation
+import os.log
 
 /// MFCC extraction pipeline using Accelerate framework.
 ///
@@ -35,6 +36,7 @@ enum MelFilterbank {
     static let numMFCCs = 13
     static let preEmphasis: Float = 0.97
     static let deltaWidth = 2
+    private static let logger = Logger(subsystem: "com.lifememo.app", category: "MelFilterbank")
 
     // MARK: - Public API
 
@@ -124,38 +126,80 @@ enum MelFilterbank {
         )
     }
 
-    /// Reads mono 16kHz audio samples from a file URL.
+    /// Reads mono Float32 samples from a file URL.
     ///
     /// - Parameter url: Path to the audio file.
     /// - Returns: Tuple of (samples, sampleRate), or `nil` on failure.
     static func readSamples(url: URL) -> (samples: [Float], sampleRate: Float)? {
-        guard let audioFile = try? AVAudioFile(forReading: url) else { return nil }
+        guard let audioFile = try? AVAudioFile(forReading: url) else {
+            logger.debug("readSamples open_failed file=\(url.lastPathComponent, privacy: .public)")
+            return nil
+        }
 
-        let sampleRate = Float(audioFile.fileFormat.sampleRate)
+        let processingFormat = audioFile.processingFormat
+        let sampleRate = Float(processingFormat.sampleRate)
         let frameCount = AVAudioFrameCount(audioFile.length)
-        guard frameCount > 0 else { return nil }
+        guard frameCount > 0 else {
+            logger.debug("readSamples zero_frame_count file=\(url.lastPathComponent, privacy: .public)")
+            return nil
+        }
 
-        guard let format = AVAudioFormat(
+        guard let readFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
-            sampleRate: Double(sampleRate),
-            channels: 1,
+            sampleRate: processingFormat.sampleRate,
+            channels: processingFormat.channelCount,
             interleaved: false
-        ) else { return nil }
+        ) else {
+            logger.debug("readSamples format_build_failed file=\(url.lastPathComponent, privacy: .public)")
+            return nil
+        }
 
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: readFormat, frameCapacity: frameCount) else {
+            logger.debug("readSamples buffer_alloc_failed file=\(url.lastPathComponent, privacy: .public)")
             return nil
         }
 
         do {
             try audioFile.read(into: buffer)
         } catch {
+            logger.debug(
+                "readSamples read_failed file=\(url.lastPathComponent, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
             return nil
         }
 
-        guard let channelData = buffer.floatChannelData else { return nil }
-        let samples = Array(UnsafeBufferPointer(start: channelData[0], count: Int(buffer.frameLength)))
+        let sampleCount = Int(buffer.frameLength)
+        guard sampleCount > 0 else {
+            logger.debug("readSamples zero_frame_length file=\(url.lastPathComponent, privacy: .public)")
+            return nil
+        }
+        guard let channelData = buffer.floatChannelData else {
+            logger.debug("readSamples missing_channel_data file=\(url.lastPathComponent, privacy: .public)")
+            return nil
+        }
 
-        return (samples: samples, sampleRate: sampleRate)
+        let channelCount = Int(buffer.format.channelCount)
+        guard channelCount > 0 else {
+            logger.debug("readSamples zero_channel_count file=\(url.lastPathComponent, privacy: .public)")
+            return nil
+        }
+        if channelCount == 1 {
+            let samples = Array(
+                UnsafeBufferPointer(start: channelData[0], count: sampleCount)
+            )
+            return (samples: samples, sampleRate: sampleRate)
+        }
+
+        var mono = [Float](repeating: 0, count: sampleCount)
+        for channel in 0..<channelCount {
+            let data = UnsafeBufferPointer(start: channelData[channel], count: sampleCount)
+            for index in 0..<sampleCount {
+                mono[index] += data[index]
+            }
+        }
+        var scale = 1.0 / Float(channelCount)
+        vDSP_vsmul(mono, 1, &scale, &mono, 1, vDSP_Length(sampleCount))
+        return (samples: mono, sampleRate: sampleRate)
     }
 
     // MARK: - Mel Conversion

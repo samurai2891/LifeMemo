@@ -1,9 +1,11 @@
 import AVFoundation
 import Foundation
+import os.log
 
 enum VoiceEnrollmentError: LocalizedError {
     case promptNotFound
-    case invalidAudioFile
+    case emptyOrUnflushedFile
+    case decodeFailed
     case insufficientSpeech
     case lowQuality([String])
     case embeddingUnavailable
@@ -13,8 +15,10 @@ enum VoiceEnrollmentError: LocalizedError {
         switch self {
         case .promptNotFound:
             return "選択した登録プロンプトが見つかりません。"
-        case .invalidAudioFile:
-            return "録音ファイルの読み込みに失敗しました。"
+        case .emptyOrUnflushedFile:
+            return "録音ファイルが空または保存中です。数秒待って再試行してください。"
+        case .decodeFailed:
+            return "録音ファイルをデコードできませんでした。再録音してください。"
         case .insufficientSpeech:
             return "音声区間が短すぎます。もう一度録音してください。"
         case .lowQuality(let reasons):
@@ -38,6 +42,7 @@ actor VoiceEnrollmentService {
     }
 
     private let repository: VoiceEnrollmentProfileStoring
+    private let logger = Logger(subsystem: "com.lifememo.app", category: "VoiceEnrollmentService")
     private var pendingTakes: [Int: EnrollmentTake] = [:]
 
     init(repository: VoiceEnrollmentProfileStoring) {
@@ -73,6 +78,9 @@ actor VoiceEnrollmentService {
             quality: analysis.quality
         )
         pendingTakes[promptId] = take
+        logger.info(
+            "Enrollment take accepted promptId=\(promptId, privacy: .public) durationSec=\(analysis.quality.durationSec, privacy: .public) sampleRate=\(analysis.sourceSampleRate, privacy: .public) featureExtracted=true"
+        )
         return analysis.quality
     }
 
@@ -121,6 +129,9 @@ actor VoiceEnrollmentService {
         )
 
         repository.saveActiveProfile(profile)
+        logger.info(
+            "Enrollment profile finalized acceptedSamples=\(takes.count, privacy: .public) version=\(profile.version, privacy: .public)"
+        )
         pendingTakes.removeAll()
         return profile
     }
@@ -134,20 +145,27 @@ actor VoiceEnrollmentService {
         let quality: EnrollmentSampleQuality
         let embedding: SpeakerEmbedding
         let centroid: SpeakerFeatureVector
+        let sourceSampleRate: Float
     }
 
     private func analyzeTake(url: URL) throws -> TakeAnalysis {
+        guard FileManager.default.fileExists(atPath: url.path),
+              let fileSize = Self.fileSizeBytes(at: url),
+              fileSize > 0 else {
+            throw VoiceEnrollmentError.emptyOrUnflushedFile
+        }
+
         guard let audio = MelFilterbank.readSamples(url: url) else {
-            throw VoiceEnrollmentError.invalidAudioFile
+            throw VoiceEnrollmentError.decodeFailed
         }
 
         let samples = audio.samples
         let sampleRate = audio.sampleRate
-        guard !samples.isEmpty else { throw VoiceEnrollmentError.invalidAudioFile }
+        guard !samples.isEmpty else { throw VoiceEnrollmentError.decodeFailed }
 
         let canonicalRate: Float = 16_000
         let canonicalSamples = Self.resampleIfNeeded(samples: samples, from: sampleRate, to: canonicalRate)
-        guard !canonicalSamples.isEmpty else { throw VoiceEnrollmentError.invalidAudioFile }
+        guard !canonicalSamples.isEmpty else { throw VoiceEnrollmentError.decodeFailed }
 
         let mfcc = MelFilterbank.extractMFCCs(samples: canonicalSamples, sampleRate: canonicalRate)
         guard !mfcc.mfccs.isEmpty else { throw VoiceEnrollmentError.insufficientSpeech }
@@ -204,7 +222,12 @@ actor VoiceEnrollmentService {
             accepted: true,
             rejectionReasons: []
         )
-        return TakeAnalysis(quality: quality, embedding: embedding, centroid: centroid)
+        return TakeAnalysis(
+            quality: quality,
+            embedding: embedding,
+            centroid: centroid,
+            sourceSampleRate: sampleRate
+        )
     }
 
     private func filterOutlierEmbeddings(_ embeddings: [SpeakerEmbedding]) -> [SpeakerEmbedding] {
@@ -290,5 +313,13 @@ actor VoiceEnrollmentService {
         }
 
         return output
+    }
+
+    private static func fileSizeBytes(at url: URL) -> Int64? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let fileSize = attributes[.size] as? NSNumber else {
+            return nil
+        }
+        return fileSize.int64Value
     }
 }

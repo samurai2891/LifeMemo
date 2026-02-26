@@ -477,6 +477,9 @@ final class SessionRepository {
             enrollment: enrollment
         ) else { return }
 
+        logger.info(
+            "Voice enrollment match speaker=\(assignment.globalSpeakerIndex, privacy: .public) identity=\(assignment.result.identity.rawValue, privacy: .public) distance=\(assignment.result.distance, privacy: .public) confidence=\(assignment.result.confidence, privacy: .public) reason=\(assignment.result.decisionReason, privacy: .public)"
+        )
         guard assignment.result.identity == .me else { return }
 
         var names = session.speakerNames
@@ -484,6 +487,9 @@ final class SessionRepository {
         if existing == nil || existing == enrollment.displayName {
             names[assignment.globalSpeakerIndex] = enrollment.displayName
             session.setSpeakerNames(names)
+            logger.info(
+                "Voice enrollment assigned speaker=\(assignment.globalSpeakerIndex, privacy: .public) name=\(enrollment.displayName, privacy: .public)"
+            )
         }
 
         guard speakerIdentityMatcher.shouldAdaptProfile(from: assignment.result),
@@ -493,6 +499,9 @@ final class SessionRepository {
                 matchedProfile: matched
               ) else { return }
         voiceEnrollmentRepository.saveActiveProfile(adapted)
+        logger.info(
+            "Voice enrollment adapted profile version=\(adapted.version, privacy: .public) adaptationCount=\(adapted.adaptationCount, privacy: .public)"
+        )
     }
 
     /// Reconciles live edits with final transcription segments, applying matched
