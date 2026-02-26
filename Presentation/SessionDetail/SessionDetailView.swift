@@ -977,6 +977,10 @@ private struct ShareSheet: UIViewControllerRepresentable {
     ) {}
 }
 
-#Preview {
-    Text("SessionDetailView requires AppContainer")
+#if DEBUG
+private struct SessionDetailView_Previews: PreviewProvider {
+    static var previews: some View {
+        Text("SessionDetailView requires AppContainer")
+    }
 }
+#endif

@@ -66,6 +66,10 @@ struct RecordingIndicatorOverlay: View {
     }
 }
 
-#Preview {
-    RecordingIndicatorOverlay()
+#if DEBUG
+private struct RecordingIndicatorOverlay_Previews: PreviewProvider {
+    static var previews: some View {
+        RecordingIndicatorOverlay()
+    }
 }
+#endif

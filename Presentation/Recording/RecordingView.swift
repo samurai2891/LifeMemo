@@ -303,6 +303,10 @@ struct RecordingView: View {
     }
 }
 
-#Preview {
-    Text("RecordingView requires AppContainer")
+#if DEBUG
+private struct RecordingView_Previews: PreviewProvider {
+    static var previews: some View {
+        Text("RecordingView requires AppContainer")
+    }
 }
+#endif

@@ -191,6 +191,10 @@ private struct ExportShareSheet: UIViewControllerRepresentable {
     ) {}
 }
 
-#Preview {
-    Text("ExportOptionsView requires EnhancedExportService")
+#if DEBUG
+private struct ExportOptionsView_Previews: PreviewProvider {
+    static var previews: some View {
+        Text("ExportOptionsView requires EnhancedExportService")
+    }
 }
+#endif

@@ -148,7 +148,7 @@ final class BackupService: ObservableObject {
 
         // Combine: manifestLength(8 bytes) + manifestJSON + audioData
         var payload = Data()
-        var manifestLength = UInt64(manifestData.count)
+        var manifestLength = UInt64(manifestData.count).littleEndian
         payload.append(Data(bytes: &manifestLength, count: 8))
         payload.append(manifestData)
         payload.append(audioData)
@@ -197,7 +197,13 @@ final class BackupService: ObservableObject {
             throw BackupError.invalidFormat
         }
 
-        let manifestLength = payload.prefix(8).withUnsafeBytes { $0.load(as: UInt64.self) }
+        let manifestLength: UInt64 = {
+            var littleEndianValue: UInt64 = 0
+            withUnsafeMutableBytes(of: &littleEndianValue) { bytes in
+                bytes.copyBytes(from: payload.prefix(8))
+            }
+            return UInt64(littleEndian: littleEndianValue)
+        }()
         let manifestEnd = 8 + Int(manifestLength)
         guard manifestEnd <= payload.count else {
             throw BackupError.invalidFormat
@@ -240,6 +246,7 @@ final class BackupService: ObservableObject {
                 let fileData = audioData[audioStartIndex..<audioEndIndex]
                 if let fileURL = try? fileStore.ensureAudioFileURL(relativePath: audioEntry.relativePath) {
                     try? Data(fileData).write(to: fileURL, options: [.atomic])
+                    fileStore.setAtRestProtection(at: fileURL)
                 }
             }
 

@@ -219,6 +219,10 @@ struct EditHistoryView: View {
     }
 }
 
-#Preview {
-    Text("EditHistoryView requires SessionDetailViewModel")
+#if DEBUG
+private struct EditHistoryView_Previews: PreviewProvider {
+    static var previews: some View {
+        Text("EditHistoryView requires SessionDetailViewModel")
+    }
 }
+#endif

@@ -11,7 +11,8 @@ struct AdvancedSearchView: View {
     // MARK: - State
 
     @State private var filter = SearchFilter()
-    @State private var results: [SearchResult] = []
+    @State private var segmentResults: [SearchResult] = []
+    @State private var sessionResults: [SessionSummary] = []
     @State private var isSearching = false
     @State private var showFilters = false
     @State private var currentPage = 0
@@ -34,7 +35,7 @@ struct AdvancedSearchView: View {
                 if isSearching {
                     ProgressView("Searching...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if results.isEmpty && !filter.isEmpty {
+                } else if segmentResults.isEmpty && sessionResults.isEmpty && !filter.isEmpty {
                     emptyState
                 } else {
                     resultsList
@@ -65,7 +66,8 @@ struct AdvancedSearchView: View {
                 if !filter.query.isEmpty {
                     Button {
                         filter.query = ""
-                        results = []
+                        segmentResults = []
+                        sessionResults = []
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
@@ -165,32 +167,45 @@ struct AdvancedSearchView: View {
 
     private var resultsList: some View {
         List {
-            if !results.isEmpty {
+            if !segmentResults.isEmpty || !sessionResults.isEmpty {
                 Text("\(totalCount) results found")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .listRowSeparator(.hidden)
             }
 
-            ForEach(results) { result in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text(result.sessionTitle)
+            if !segmentResults.isEmpty {
+                ForEach(segmentResults) { result in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(result.sessionTitle)
+                                .font(.subheadline.bold())
+
+                            Spacer()
+
+                            Text(formatMs(result.startMs))
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Text(result.segmentText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+                    .padding(.vertical, 4)
+                }
+            } else {
+                ForEach(sessionResults) { session in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(session.title.isEmpty ? "Untitled" : session.title)
                             .font(.subheadline.bold())
-
-                        Spacer()
-
-                        Text(formatMs(result.startMs))
-                            .font(.caption.monospacedDigit())
+                        Text(session.startedAt, style: .date)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-
-                    Text(result.segmentText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
             }
 
             if hasMore {
@@ -318,15 +333,38 @@ struct AdvancedSearchView: View {
 
     private func performSearch() {
         guard !filter.isEmpty else {
-            results = []
+            segmentResults = []
+            sessionResults = []
             totalCount = 0
             hasMore = false
             return
         }
 
         isSearching = true
+        if currentPage == 0 {
+            segmentResults = []
+            sessionResults = []
+        }
+
         let searchResults = container.advancedSearch.search(filter: filter, page: currentPage)
-        results = currentPage == 0 ? searchResults.segments : results + searchResults.segments
+        if !searchResults.segments.isEmpty {
+            segmentResults = currentPage == 0
+                ? searchResults.segments
+                : segmentResults + searchResults.segments
+            if currentPage == 0 {
+                sessionResults = []
+            }
+        } else if !searchResults.sessionIds.isEmpty {
+            let pageSessions = searchResults.sessionIds.compactMap { sessionId in
+                container.repository.fetchSession(id: sessionId)?.toSummary()
+            }
+            sessionResults = currentPage == 0
+                ? pageSessions
+                : sessionResults + pageSessions
+            if currentPage == 0 {
+                segmentResults = []
+            }
+        }
         totalCount = searchResults.totalCount
         hasMore = searchResults.hasMore
         isSearching = false
@@ -348,6 +386,10 @@ struct AdvancedSearchView: View {
     }
 }
 
-#Preview {
-    AdvancedSearchView()
+#if DEBUG
+private struct AdvancedSearchView_Previews: PreviewProvider {
+    static var previews: some View {
+        AdvancedSearchView()
+    }
 }
+#endif

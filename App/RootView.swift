@@ -60,6 +60,10 @@ struct RootView: View {
     }
 }
 
-#Preview {
-    Text("RootView requires AppContainer environment")
+#if DEBUG
+private struct RootView_Previews: PreviewProvider {
+    static var previews: some View {
+        Text("RootView requires AppContainer environment")
+    }
 }
+#endif

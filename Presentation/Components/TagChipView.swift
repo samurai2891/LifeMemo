@@ -67,14 +67,18 @@ extension Color {
     }
 }
 
-#Preview {
-    HStack {
-        TagChipView(tag: TagInfo(id: UUID(), name: "Work", colorHex: "#FF5733"))
-        TagChipView(tag: TagInfo(id: UUID(), name: "Personal", colorHex: nil))
-        TagChipView(
-            tag: TagInfo(id: UUID(), name: "Removable", colorHex: "#3366FF"),
-            onRemove: {}
-        )
+#if DEBUG
+private struct TagChipView_Previews: PreviewProvider {
+    static var previews: some View {
+        HStack {
+            TagChipView(tag: TagInfo(id: UUID(), name: "Work", colorHex: "#FF5733"))
+            TagChipView(tag: TagInfo(id: UUID(), name: "Personal", colorHex: nil))
+            TagChipView(
+                tag: TagInfo(id: UUID(), name: "Removable", colorHex: "#3366FF"),
+                onRemove: {}
+            )
+        }
+        .padding()
     }
-    .padding()
 }
+#endif

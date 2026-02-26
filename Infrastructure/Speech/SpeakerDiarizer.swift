@@ -16,6 +16,7 @@ import Foundation
 /// The public API signature is unchanged so callers (`TranscriptionQueueActor`,
 /// `AppContainer`) require no modifications.
 final class SpeakerDiarizer {
+    private static let canonicalSampleRate: Float = 16_000
 
     // MARK: - Public API
 
@@ -32,23 +33,38 @@ final class SpeakerDiarizer {
 
         // Step 1: Read audio and extract MFCCs
         guard let audio = MelFilterbank.readSamples(url: audioURL) else {
-            return makeSingleSpeakerResult(wordSegments: wordSegments)
+            return makeSingleSpeakerResult(
+                wordSegments: wordSegments,
+                audioURL: audioURL
+            )
         }
-
-        let mfccResult = MelFilterbank.extractMFCCs(
+        let canonicalSamples = Self.resampleIfNeeded(
             samples: audio.samples,
-            sampleRate: audio.sampleRate
+            from: audio.sampleRate,
+            to: Self.canonicalSampleRate
         )
 
+        let mfccResult = MelFilterbank.extractMFCCs(
+            samples: canonicalSamples,
+            sampleRate: Self.canonicalSampleRate
+        )
+        let frameHopSec = Float(MelFilterbank.frameHop) / Self.canonicalSampleRate
+
         guard !mfccResult.mfccs.isEmpty else {
-            return makeSingleSpeakerResult(wordSegments: wordSegments)
+            return makeSingleSpeakerResult(
+                wordSegments: wordSegments,
+                audioURL: audioURL
+            )
         }
 
         // Step 2: Voice Activity Detection
         let speechRegions = EnergyVAD.detectSpeechRegions(rmsEnergies: mfccResult.rmsEnergies)
 
         guard !speechRegions.isEmpty else {
-            return makeSingleSpeakerResult(wordSegments: wordSegments)
+            return makeSingleSpeakerResult(
+                wordSegments: wordSegments,
+                audioURL: audioURL
+            )
         }
 
         // Step 3: BIC segmentation
@@ -60,12 +76,15 @@ final class SpeakerDiarizer {
         // Build segment ranges from boundaries + speech regions
         let segmentRanges = buildSegmentRanges(
             speechRegions: speechRegions,
-            boundaries: boundaries,
-            totalFrames: mfccResult.mfccs.count
+            boundaries: boundaries
         )
 
         guard segmentRanges.count > 1 else {
-            return makeSingleSpeakerResult(wordSegments: wordSegments, mfccResult: mfccResult)
+            return makeSingleSpeakerResult(
+                wordSegments: wordSegments,
+                mfccResult: mfccResult,
+                audioURL: audioURL
+            )
         }
 
         // Step 4: Generate embeddings for each segment
@@ -86,14 +105,22 @@ final class SpeakerDiarizer {
         }
 
         guard embeddings.count > 1 else {
-            return makeSingleSpeakerResult(wordSegments: wordSegments, mfccResult: mfccResult)
+            return makeSingleSpeakerResult(
+                wordSegments: wordSegments,
+                mfccResult: mfccResult,
+                audioURL: audioURL
+            )
         }
 
         // Step 5: AHC clustering
         let clusterResult = AHCClusterer.cluster(embeddings: embeddings)
 
         guard clusterResult.numClusters > 1 else {
-            return makeSingleSpeakerResult(wordSegments: wordSegments, mfccResult: mfccResult)
+            return makeSingleSpeakerResult(
+                wordSegments: wordSegments,
+                mfccResult: mfccResult,
+                audioURL: audioURL
+            )
         }
 
         // Build speaker segments from cluster labels
@@ -113,17 +140,18 @@ final class SpeakerDiarizer {
         // Step 7: Word → speaker mapping
         let mappedWords = WordSpeakerMapper.mapWords(
             words: wordSegments,
-            segments: smoothed
+            segments: smoothed,
+            frameHopSec: frameHopSec
         )
 
         // Build DiarizationResult
         return buildResult(
             mappedWords: mappedWords,
-            smoothedSegments: smoothed,
             segmentRanges: segmentRanges,
             clusterResult: clusterResult,
             embeddings: embeddings,
-            mfccResult: mfccResult
+            audioURL: audioURL,
+            frameHopSec: frameHopSec
         )
     }
 
@@ -136,12 +164,8 @@ final class SpeakerDiarizer {
 
     private func buildSegmentRanges(
         speechRegions: [EnergyVAD.SpeechRegion],
-        boundaries: [BICSegmenter.Boundary],
-        totalFrames: Int
+        boundaries: [BICSegmenter.Boundary]
     ) -> [SegmentRange] {
-        // Collect all boundary frame indices
-        let boundaryFrames = Set(boundaries.map(\.frameIndex))
-
         var ranges: [SegmentRange] = []
 
         for region in speechRegions {
@@ -178,11 +202,11 @@ final class SpeakerDiarizer {
 
     private func buildResult(
         mappedWords: [WordSpeakerMapper.MappedWord],
-        smoothedSegments: [SpeakerTurnSmoother.SpeakerSegment],
         segmentRanges: [SegmentRange],
         clusterResult: AHCClusterer.ClusterResult,
         embeddings: [SpeakerEmbedding],
-        mfccResult: MelFilterbank.MFCCResult
+        audioURL: URL,
+        frameHopSec: Float
     ) -> DiarizationResult {
         // Group consecutive words by speaker
         var diarizedSegments: [DiarizedSegment] = []
@@ -213,12 +237,19 @@ final class SpeakerDiarizer {
 
         let speakerIndices = Set(diarizedSegments.map(\.speakerIndex))
         let speakerCount = speakerIndices.count
+        let legacyCentroids = makeLegacyCentroids(
+            audioURL: audioURL,
+            segmentRanges: segmentRanges,
+            clusterLabels: clusterResult.labels,
+            frameHopSec: frameHopSec
+        )
 
         // Build speaker profiles with MFCC embeddings
         let profiles = buildSpeakerProfiles(
             speakerLabels: Array(speakerIndices).sorted(),
             clusterLabels: clusterResult.labels,
-            embeddings: embeddings
+            embeddings: embeddings,
+            legacyCentroids: legacyCentroids
         )
 
         return DiarizationResult(
@@ -249,7 +280,8 @@ final class SpeakerDiarizer {
     private func buildSpeakerProfiles(
         speakerLabels: [Int],
         clusterLabels: [Int],
-        embeddings: [SpeakerEmbedding]
+        embeddings: [SpeakerEmbedding],
+        legacyCentroids: [Int: SpeakerFeatureVector]
     ) -> [SpeakerProfile] {
         speakerLabels.compactMap { label in
             // Collect all embeddings assigned to this speaker
@@ -258,17 +290,12 @@ final class SpeakerDiarizer {
                 .map(\.1)
 
             let centroidEmbedding = SpeakerEmbedding.centroid(of: speakerEmbeddings)
-
-            // Dummy legacy centroid for backward compatibility
-            let dummyCentroid = SpeakerFeatureVector(
-                meanPitch: 0, pitchStdDev: 0, meanEnergy: 0,
-                meanSpectralCentroid: 0, meanJitter: 0, meanShimmer: 0
-            )
+            let centroid = legacyCentroids[label] ?? Self.zeroCentroid
 
             return SpeakerProfile(
                 id: UUID(),
                 speakerIndex: label,
-                centroid: dummyCentroid,
+                centroid: centroid,
                 sampleCount: speakerEmbeddings.count,
                 mfccEmbedding: centroidEmbedding
             )
@@ -279,7 +306,8 @@ final class SpeakerDiarizer {
 
     private func makeSingleSpeakerResult(
         wordSegments: [WordSegmentInfo],
-        mfccResult: MelFilterbank.MFCCResult? = nil
+        mfccResult: MelFilterbank.MFCCResult? = nil,
+        audioURL: URL? = nil
     ) -> DiarizationResult {
         guard !wordSegments.isEmpty else {
             return DiarizationResult(segments: [], speakerCount: 0)
@@ -306,14 +334,16 @@ final class SpeakerDiarizer {
                 deltas: mfccResult.deltas,
                 deltaDeltas: mfccResult.deltaDeltas
             )
-            let dummyCentroid = SpeakerFeatureVector(
-                meanPitch: 0, pitchStdDev: 0, meanEnergy: 0,
-                meanSpectralCentroid: 0, meanJitter: 0, meanShimmer: 0
-            )
+            let centroid = audioURL.flatMap {
+                estimateSingleSpeakerCentroid(
+                    audioURL: $0,
+                    wordSegments: wordSegments
+                )
+            } ?? Self.zeroCentroid
             profiles.append(SpeakerProfile(
                 id: UUID(),
                 speakerIndex: 0,
-                centroid: dummyCentroid,
+                centroid: centroid,
                 sampleCount: 1,
                 mfccEmbedding: embedding
             ))
@@ -324,5 +354,121 @@ final class SpeakerDiarizer {
             speakerCount: 1,
             speakerProfiles: profiles
         )
+    }
+
+    private func makeLegacyCentroids(
+        audioURL: URL,
+        segmentRanges: [SegmentRange],
+        clusterLabels: [Int],
+        frameHopSec: Float
+    ) -> [Int: SpeakerFeatureVector] {
+        guard !segmentRanges.isEmpty else { return [:] }
+
+        let windows: [(startSec: TimeInterval, durationSec: TimeInterval)] = segmentRanges.map { range in
+            let startSec = TimeInterval(Double(range.startFrame) * Double(frameHopSec))
+            let durationSec = TimeInterval(
+                max(0.03, Double(range.endFrame - range.startFrame) * Double(frameHopSec))
+            )
+            return (startSec: startSec, durationSec: durationSec)
+        }
+        let features = AudioFeatureExtractor.extractFeatures(url: audioURL, windows: windows)
+
+        var vectorsBySpeaker: [Int: [SpeakerFeatureVector]] = [:]
+        for (idx, feature) in features.enumerated() {
+            guard idx < clusterLabels.count else { continue }
+            guard let vector = Self.makeFeatureVector(feature) else { continue }
+            let label = clusterLabels[idx]
+            vectorsBySpeaker[label, default: []].append(vector)
+        }
+
+        var centroids: [Int: SpeakerFeatureVector] = [:]
+        for (label, vectors) in vectorsBySpeaker {
+            if let centroid = SpeakerFeatureVector.centroid(of: vectors) {
+                centroids[label] = centroid
+            }
+        }
+        return centroids
+    }
+
+    private func estimateSingleSpeakerCentroid(
+        audioURL: URL,
+        wordSegments: [WordSegmentInfo]
+    ) -> SpeakerFeatureVector? {
+        guard let firstStart = wordSegments.min(by: { $0.timestamp < $1.timestamp })?.timestamp else {
+            return nil
+        }
+        guard let lastEnd = wordSegments.max(
+            by: { ($0.timestamp + $0.duration) < ($1.timestamp + $1.duration) }
+        ).map({ $0.timestamp + $0.duration }) else {
+            return nil
+        }
+
+        let durationSec = max(0.03, lastEnd - firstStart)
+        let features = AudioFeatureExtractor.extractFeatures(
+            url: audioURL,
+            windows: [(startSec: firstStart, durationSec: durationSec)]
+        )
+        guard let first = features.first else { return nil }
+        return Self.makeFeatureVector(first)
+    }
+
+    private static func makeFeatureVector(
+        _ feature: AudioFeatureExtractor.WindowFeatures
+    ) -> SpeakerFeatureVector? {
+        guard let meanPitch = feature.meanPitch,
+              let pitchStdDev = feature.pitchStdDev,
+              let meanEnergy = feature.meanEnergy,
+              let meanSpectralCentroid = feature.meanSpectralCentroid,
+              let meanJitter = feature.jitter,
+              let meanShimmer = feature.shimmer else {
+            return nil
+        }
+
+        return SpeakerFeatureVector(
+            meanPitch: meanPitch,
+            pitchStdDev: pitchStdDev,
+            meanEnergy: meanEnergy,
+            meanSpectralCentroid: meanSpectralCentroid,
+            meanJitter: meanJitter,
+            meanShimmer: meanShimmer
+        )
+    }
+
+    private static var zeroCentroid: SpeakerFeatureVector {
+        SpeakerFeatureVector(
+            meanPitch: 0,
+            pitchStdDev: 0,
+            meanEnergy: 0,
+            meanSpectralCentroid: 0,
+            meanJitter: 0,
+            meanShimmer: 0
+        )
+    }
+
+    private static func resampleIfNeeded(
+        samples: [Float],
+        from sourceRate: Float,
+        to targetRate: Float
+    ) -> [Float] {
+        guard !samples.isEmpty else { return [] }
+        guard sourceRate > 0, targetRate > 0 else { return samples }
+        guard abs(sourceRate - targetRate) > 1 else { return samples }
+        guard samples.count > 1 else { return samples }
+
+        let ratio = Double(sourceRate / targetRate)
+        let outputCount = max(1, Int((Double(samples.count) / ratio).rounded()))
+        var output = [Float](repeating: 0, count: outputCount)
+
+        for i in 0..<outputCount {
+            let srcPosition = Double(i) * ratio
+            let left = Int(srcPosition)
+            let right = min(left + 1, samples.count - 1)
+            let fraction = Float(srcPosition - Double(left))
+            let leftValue = samples[min(left, samples.count - 1)]
+            let rightValue = samples[right]
+            output[i] = leftValue + (rightValue - leftValue) * fraction
+        }
+
+        return output
     }
 }

@@ -67,6 +67,13 @@ struct TranscriptionDiagnostics {
     let alignmentScore: Double
 }
 
+private final class RecognitionRequestState: @unchecked Sendable {
+    let lock = NSLock()
+    var task: SFSpeechRecognitionTask?
+    var continuation: CheckedContinuation<TranscriptionDetail, Error>?
+    var hasCompleted = false
+}
+
 /// On-device speech transcription using Apple's Speech framework.
 ///
 /// Uses `SFSpeechURLRecognitionRequest` with `requiresOnDeviceRecognition = true`
@@ -157,10 +164,7 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
         mode: RecognitionMode
     ) async throws -> TranscriptionDetail {
         let startedAt = Date()
-        let stateLock = NSLock()
-        var task: SFSpeechRecognitionTask?
-        var continuation: CheckedContinuation<TranscriptionDetail, Error>?
-        var hasCompleted = false
+        let requestState = RecognitionRequestState()
         var mergedSegments: [MergedWordKey: WordSegmentInfo] = [:]
         var mergedConflictTexts: [MergedWordKey: Set<String>] = [:]
 
@@ -172,20 +176,20 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
                 request.addsPunctuation = true
                 request.taskHint = .dictation
 
-                stateLock.withLock {
-                    continuation = cont
+                requestState.lock.withLock {
+                    requestState.continuation = cont
                 }
 
-                task = recognizer.recognitionTask(with: request) { [weak self] result, error in
+                let recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
                     var completionResult: Result<TranscriptionDetail, Error>?
 
-                    stateLock.withLock {
-                        guard !hasCompleted else { return }
+                    requestState.lock.withLock {
+                        guard !requestState.hasCompleted else { return }
 
                         if let error {
-                            hasCompleted = true
-                            continuation = nil
-                            task = nil
+                            requestState.hasCompleted = true
+                            requestState.continuation = nil
+                            requestState.task = nil
                             self?.setActiveRecognitionTask(nil)
                             completionResult = .failure(
                                 TranscriptionError.recognitionFailed(underlying: error)
@@ -228,9 +232,9 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
                             qualitySignals: resolved.signals
                         )
 
-                        hasCompleted = true
-                        continuation = nil
-                        task = nil
+                        requestState.hasCompleted = true
+                        requestState.continuation = nil
+                        requestState.task = nil
                         self?.setActiveRecognitionTask(nil)
                         completionResult = .success(
                             TranscriptionDetail(
@@ -261,20 +265,23 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
                     guard let completionResult else { return }
                     cont.resume(with: completionResult)
                 }
-                self.setActiveRecognitionTask(task)
+                requestState.lock.withLock {
+                    requestState.task = recognitionTask
+                }
+                self.setActiveRecognitionTask(recognitionTask)
             }
         }, onCancel: {
             var cancellationContinuation: CheckedContinuation<TranscriptionDetail, Error>?
 
-            stateLock.withLock {
-                task?.cancel()
-                task = nil
+            requestState.lock.withLock {
+                requestState.task?.cancel()
+                requestState.task = nil
                 self.setActiveRecognitionTask(nil)
 
-                guard !hasCompleted else { return }
-                hasCompleted = true
-                cancellationContinuation = continuation
-                continuation = nil
+                guard !requestState.hasCompleted else { return }
+                requestState.hasCompleted = true
+                cancellationContinuation = requestState.continuation
+                requestState.continuation = nil
             }
 
             cancellationContinuation?.resume(throwing: CancellationError())
@@ -306,8 +313,8 @@ final class OnDeviceTranscriber: TranscriptionServiceProtocol {
             confidence: seg.confidence,
             averagePitch: extractAveragePitch(from: seg),
             pitchStdDev: extractStdDev(from: analytics?.pitch),
-            averageEnergy: nil,           // Not available in voiceAnalytics; AudioFeatureExtractor fills this
-            averageSpectralCentroid: nil,  // Same — filled by AudioFeatureExtractor
+            averageEnergy: nil,           // Not available in SF voiceAnalytics
+            averageSpectralCentroid: nil, // Not available in SF voiceAnalytics
             averageJitter: extractAverage(from: analytics?.jitter),
             averageShimmer: extractAverage(from: analytics?.shimmer)
         )

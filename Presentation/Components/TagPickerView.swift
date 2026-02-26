@@ -141,13 +141,17 @@ struct TagPickerView: View {
     }
 }
 
-#Preview {
-    TagPickerView(
-        sessionId: UUID(),
-        repository: SessionRepository(
-            context: CoreDataStack(modelName: "LifeMemo").viewContext,
-            fileStore: FileStore()
-        ),
-        sessionTags: []
-    )
+#if DEBUG
+private struct TagPickerView_Previews: PreviewProvider {
+    static var previews: some View {
+        TagPickerView(
+            sessionId: UUID(),
+            repository: SessionRepository(
+                context: CoreDataStack(modelName: "LifeMemo").viewContext,
+                fileStore: FileStore()
+            ),
+            sessionTags: []
+        )
+    }
 }
+#endif

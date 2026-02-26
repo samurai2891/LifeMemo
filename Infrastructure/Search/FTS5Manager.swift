@@ -7,7 +7,7 @@ import os.log
 /// Maintains a separate FTS5 database that mirrors transcript text from Core Data.
 /// This enables much faster full-text search than Core Data's CONTAINS predicate,
 /// especially for hundreds of sessions with thousands of segments.
-final class FTS5Manager {
+final class FTS5Manager: TranscriptSearchIndexing {
 
     struct FTSMatch {
         let segmentId: UUID
@@ -77,7 +77,7 @@ final class FTS5Manager {
     // MARK: - Indexing
 
     func indexSegment(segmentId: UUID, sessionId: UUID, text: String) {
-        queue.async { [weak self] in
+        queue.sync { [weak self] in
             guard let self, let db = self.db else { return }
 
             // Delete existing entry if any
@@ -122,7 +122,7 @@ final class FTS5Manager {
     }
 
     func removeSegment(segmentId: UUID) {
-        queue.async { [weak self] in
+        queue.sync { [weak self] in
             guard let self, let db = self.db else { return }
             let sql = "DELETE FROM segments_fts WHERE segment_id = ?;"
             var stmt: OpaquePointer?
@@ -139,7 +139,7 @@ final class FTS5Manager {
     }
 
     func removeSession(sessionId: UUID) {
-        queue.async { [weak self] in
+        queue.sync { [weak self] in
             guard let self, let db = self.db else { return }
             let sql = "DELETE FROM segments_fts WHERE session_id = ?;"
             var stmt: OpaquePointer?
@@ -235,7 +235,7 @@ final class FTS5Manager {
     // MARK: - Rebuild Index
 
     func rebuildIndex(segments: [(segmentId: UUID, sessionId: UUID, text: String)]) {
-        queue.async { [weak self] in
+        queue.sync { [weak self] in
             guard let self, let db = self.db else { return }
 
             self.execute("DELETE FROM segments_fts;")

@@ -34,18 +34,7 @@ final class CoreDataStack {
             }
         }
 
-        container.loadPersistentStores { description, error in
-            if let error = error {
-                fatalError("Core Data failed to load: \(error.localizedDescription)")
-            }
-            // Set database file protection (skip for in-memory stores)
-            if let url = description.url {
-                try? FileManager.default.setAttributes(
-                    [.protectionKey: FileProtectionType.completeUnlessOpen],
-                    ofItemAtPath: url.path
-                )
-            }
-        }
+        loadPersistentStoresWithFallback()
         container.viewContext.automaticallyMergesChangesFromParent = true
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     }
@@ -136,6 +125,62 @@ final class CoreDataStack {
         } catch {
             logger.error("CoreData save error: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    private func loadPersistentStoresWithFallback() {
+        if loadPersistentStores() {
+            return
+        }
+
+        logger.error("Primary Core Data store failed. Falling back to in-memory store.")
+
+        let fallbackDescription = NSPersistentStoreDescription()
+        fallbackDescription.type = NSInMemoryStoreType
+        container.persistentStoreDescriptions = [fallbackDescription]
+
+        if !loadPersistentStores() {
+            logger.fault("Core Data failed to load both persistent and in-memory stores.")
+            assertionFailure("Core Data store initialization failed")
+        }
+    }
+
+    private func loadPersistentStores() -> Bool {
+        let expectedCount = max(container.persistentStoreDescriptions.count, 1)
+        let semaphore = DispatchSemaphore(value: 0)
+        let lock = NSLock()
+        var completedCount = 0
+        var didSucceed = true
+
+        container.loadPersistentStores { description, error in
+            defer {
+                lock.lock()
+                completedCount += 1
+                let shouldSignal = completedCount >= expectedCount
+                lock.unlock()
+                if shouldSignal {
+                    semaphore.signal()
+                }
+            }
+
+            if let error = error {
+                lock.lock()
+                didSucceed = false
+                lock.unlock()
+                self.logger.error("Core Data failed to load: \(error.localizedDescription, privacy: .public)")
+                return
+            }
+
+            // Set database file protection (skip for in-memory stores)
+            if let url = description.url {
+                try? FileManager.default.setAttributes(
+                    [.protectionKey: FileProtectionType.completeUnlessOpen],
+                    ofItemAtPath: url.path
+                )
+            }
+        }
+
+        semaphore.wait()
+        return didSucceed
     }
 
     // MARK: - Entity Builders

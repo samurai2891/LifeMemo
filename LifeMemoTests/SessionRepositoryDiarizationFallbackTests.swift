@@ -106,6 +106,41 @@ final class SessionRepositoryDiarizationFallbackTests: XCTestCase {
         XCTAssertEqual(session.segmentsArray.map { $0.text ?? "" }.joined(separator: " "), fullText)
     }
 
+    func testSaveTranscriptWithSpeakersCanBypassRepositoryFallbackGuard() {
+        let (sessionId, chunkId) = prepareSessionWithChunk(durationSec: 60)
+        let fullText = "This is a full transcript sentence that should never be replaced by a tiny tail."
+        let diarization = DiarizationResult(
+            segments: [
+                DiarizedSegment(
+                    id: UUID(),
+                    speakerIndex: 0,
+                    text: "tiny tail",
+                    startOffsetMs: 56_000,
+                    endOffsetMs: 59_000
+                )
+            ],
+            speakerCount: 2,
+            speakerProfiles: []
+        )
+
+        repository.saveTranscriptWithSpeakers(
+            sessionId: sessionId,
+            chunkId: chunkId,
+            diarization: diarization,
+            fullText: fullText,
+            applyFallbackGuard: false
+        )
+
+        guard let session = repository.fetchSession(id: sessionId) else {
+            XCTFail("Session should exist")
+            return
+        }
+
+        XCTAssertEqual(session.segmentsArray.count, 1)
+        XCTAssertEqual(session.segmentsArray.first?.text, "tiny tail")
+        XCTAssertEqual(session.segmentsArray.first?.speakerIndex, 0)
+    }
+
     // MARK: - Helpers
 
     private func prepareSessionWithChunk(durationSec: Double) -> (UUID, UUID) {

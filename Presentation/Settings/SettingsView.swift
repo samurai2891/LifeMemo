@@ -30,6 +30,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             languageSection
+            voiceEnrollmentSection
             audioQualitySection
             summarizationSection
             permissionsSection
@@ -148,6 +149,22 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    // MARK: - Audio Quality Section
+
+    private var voiceEnrollmentSection: some View {
+        Section {
+            NavigationLink {
+                VoiceEnrollmentView(container: container)
+            } label: {
+                Label("Voice Enrollment", systemImage: "person.wave.2")
+            }
+        } header: {
+            Text("Speaker")
+        } footer: {
+            Text("Register your own voice in advance to improve diarization stability and automatic Me assignment.")
         }
     }
 
@@ -464,8 +481,12 @@ private struct BenchmarkResultsView: View {
     }
 }
 
-#Preview {
-    NavigationStack {
-        Text("SettingsView requires AppContainer")
+#if DEBUG
+private struct SettingsView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            Text("SettingsView requires AppContainer")
+        }
     }
 }
+#endif

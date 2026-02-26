@@ -446,10 +446,14 @@ struct OnboardingView: View {
     }
 }
 
-#Preview {
-    OnboardingView(
-        permissionService: SpeechPermissionService(),
-        onComplete: {}
-    )
-    .environmentObject(SpeechPermissionService())
+#if DEBUG
+private struct OnboardingView_Previews: PreviewProvider {
+    static var previews: some View {
+        OnboardingView(
+            permissionService: SpeechPermissionService(),
+            onComplete: {}
+        )
+        .environmentObject(SpeechPermissionService())
+    }
 }
+#endif

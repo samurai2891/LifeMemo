@@ -24,6 +24,8 @@ actor TranscriptionQueueActor {
     private var isRunning = false
     private var isRecordingActive = false
     private var pendingJobs: [(sessionId: UUID, chunkId: UUID)] = []
+    private var autoSummaryBuilder: (@MainActor @Sendable (UUID) -> String)?
+    private var transcriptionCompletionHandler: (@MainActor @Sendable (Bool) -> Void)?
 
     // MARK: - Initializer
 
@@ -89,6 +91,24 @@ actor TranscriptionQueueActor {
         }
     }
 
+    /// Injects a session summary builder used when auto-summarize is enabled.
+    func setAutoSummaryBuilder(_ builder: @escaping @MainActor @Sendable (UUID) -> String) {
+        autoSummaryBuilder = builder
+    }
+
+    /// Injects a callback for transcription completion telemetry.
+    func setTranscriptionCompletionHandler(
+        _ handler: @escaping @MainActor @Sendable (Bool) -> Void
+    ) {
+        transcriptionCompletionHandler = handler
+    }
+
+    /// Re-evaluates defer conditions after system state changes
+    /// (power mode / thermal state / app foregrounding).
+    func onSystemConditionsChanged() async {
+        await processQueueIfNeeded()
+    }
+
     // MARK: - Queue Processing
 
     private var shouldDefer: Bool {
@@ -128,6 +148,7 @@ actor TranscriptionQueueActor {
 
         guard let fileURL = chunkURL else {
             await markFailed(chunkId: chunkId, sessionId: sessionId)
+            await notifyTranscriptionCompletion(success: false)
             return
         }
 
@@ -173,7 +194,8 @@ actor TranscriptionQueueActor {
                         sessionId: sessionId,
                         chunkId: chunkId,
                         diarization: diarization,
-                        fullText: detail.formattedString
+                        fullText: detail.formattedString,
+                        applyFallbackGuard: false
                     )
                     // Save speaker profiles for cross-chunk alignment
                     if !diarization.speakerProfiles.isEmpty {
@@ -199,11 +221,34 @@ actor TranscriptionQueueActor {
                 repository.refreshSessionSummary(sessionId: sessionId)
                 repository.checkAndFinalizeSessionStatus(sessionId: sessionId)
             }
+            await notifyTranscriptionCompletion(success: true)
+
+            let shouldAutoSummarize = await MainActor.run {
+                guard SummarizationPreference.autoSummarize,
+                      let session = repository.fetchSession(id: sessionId),
+                      session.status == .ready else {
+                    return false
+                }
+                let existingSummary = (session.summary ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return existingSummary.isEmpty
+            }
+
+            if shouldAutoSummarize, let autoSummaryBuilder {
+                let markdown = await MainActor.run {
+                    autoSummaryBuilder(sessionId)
+                }
+                await MainActor.run {
+                    repository.updateSessionSummary(sessionId: sessionId, markdown: markdown)
+                }
+                logger.info("Auto summary generated for session \(sessionId.uuidString, privacy: .public)")
+            }
         } catch {
             logger.error(
                 "Transcription failed for chunk \(chunkId.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)"
             )
             await markFailed(chunkId: chunkId, sessionId: sessionId)
+            await notifyTranscriptionCompletion(success: false)
         }
     }
 
@@ -216,6 +261,13 @@ actor TranscriptionQueueActor {
                 status: .failed
             )
             repository.checkAndFinalizeSessionStatus(sessionId: sessionId)
+        }
+    }
+
+    private func notifyTranscriptionCompletion(success: Bool) async {
+        guard let transcriptionCompletionHandler else { return }
+        await MainActor.run {
+            transcriptionCompletionHandler(success)
         }
     }
 }

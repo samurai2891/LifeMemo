@@ -27,8 +27,15 @@ if [[ -n "${simulator_id}" && "${simulator_id}" != *placeholder* ]]; then
   exit 0
 fi
 
-if printf "%s\n" "${destinations}" | grep -q "name:Any iOS Simulator Device"; then
-  echo "platform=iOS Simulator,name=Any iOS Simulator Device"
+# Fallback: try simctl device list directly.
+simctl_id="$(
+  (xcrun simctl list devices available 2>/dev/null || true) \
+    | sed -n 's/.*(\([0-9A-F-]\{36\}\)).*/\1/p' \
+    | head -n 1
+)"
+
+if [[ -n "${simctl_id}" ]]; then
+  echo "id=${simctl_id}"
   exit 0
 fi
 

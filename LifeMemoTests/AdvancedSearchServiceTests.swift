@@ -9,6 +9,7 @@ final class AdvancedSearchServiceTests: XCTestCase {
     private var context: NSManagedObjectContext!
     private var repository: SessionRepository!
     private var searchService: AdvancedSearchService!
+    private var fts5Manager: FTS5Manager!
 
     override func setUp() {
         super.setUp()
@@ -25,15 +26,22 @@ final class AdvancedSearchServiceTests: XCTestCase {
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
 
         let fileStore = FileStore()
-        repository = SessionRepository(context: context, fileStore: fileStore)
+        fts5Manager = FTS5Manager()
+        repository = SessionRepository(
+            context: context,
+            fileStore: fileStore,
+            searchIndexer: fts5Manager
+        )
         searchService = AdvancedSearchService(
-            fts5Manager: FTS5Manager(),
+            fts5Manager: fts5Manager,
             context: context,
             pageSize: 1
         )
+        searchService.rebuildSearchIndex()
     }
 
     override func tearDown() {
+        fts5Manager = nil
         searchService = nil
         repository = nil
         context = nil
@@ -90,5 +98,71 @@ final class AdvancedSearchServiceTests: XCTestCase {
 
         let merged = Set(firstPage.sessionIds + secondPage.sessionIds)
         XCTAssertEqual(merged, Set([firstSessionId, secondSessionId]))
+    }
+
+    func testFTSIndexAutoUpdatesAfterTranscriptSave() {
+        let sessionId = repository.createSession(languageMode: .auto)
+        let chunkId = UUID()
+        let startAt = Date()
+
+        repository.createOrUpdateChunkStarted(
+            chunkId: chunkId,
+            sessionId: sessionId,
+            index: 0,
+            startAt: startAt,
+            relativePath: "Audio/\(sessionId.uuidString)/0000.m4a"
+        )
+        repository.finalizeChunk(
+            chunkId: chunkId,
+            sessionId: sessionId,
+            endAt: startAt.addingTimeInterval(3),
+            durationSec: 3,
+            sizeBytes: 1234
+        )
+        repository.saveTranscript(
+            sessionId: sessionId,
+            chunkId: chunkId,
+            text: "apple banana"
+        )
+
+        var filter = SearchFilter()
+        filter.query = "banana"
+        let result = searchService.search(filter: filter, page: 0)
+
+        XCTAssertEqual(result.totalCount, 1)
+        XCTAssertEqual(result.segments.first?.sessionId, sessionId)
+    }
+
+    func testFTSIndexRemovesSegmentsOnRetranscriptionReset() {
+        let sessionId = repository.createSession(languageMode: .auto)
+        let chunkId = UUID()
+        let startAt = Date()
+
+        repository.createOrUpdateChunkStarted(
+            chunkId: chunkId,
+            sessionId: sessionId,
+            index: 0,
+            startAt: startAt,
+            relativePath: "Audio/\(sessionId.uuidString)/0000.m4a"
+        )
+        repository.finalizeChunk(
+            chunkId: chunkId,
+            sessionId: sessionId,
+            endAt: startAt.addingTimeInterval(3),
+            durationSec: 3,
+            sizeBytes: 1234
+        )
+        repository.saveTranscript(
+            sessionId: sessionId,
+            chunkId: chunkId,
+            text: "stale keyword"
+        )
+
+        var filter = SearchFilter()
+        filter.query = "stale"
+        XCTAssertEqual(searchService.search(filter: filter, page: 0).totalCount, 1)
+
+        repository.resetChunkForRetranscription(chunkId: chunkId, sessionId: sessionId)
+        XCTAssertEqual(searchService.search(filter: filter, page: 0).totalCount, 0)
     }
 }

@@ -505,6 +505,10 @@ struct StatusBadge: View {
     }
 }
 
-#Preview {
-    Text("HomeView requires AppContainer")
+#if DEBUG
+private struct HomeView_Previews: PreviewProvider {
+    static var previews: some View {
+        Text("HomeView requires AppContainer")
+    }
 }
+#endif

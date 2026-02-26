@@ -6,6 +6,7 @@ struct StorageManagementView: View {
 
     // MARK: - Environment
 
+    @EnvironmentObject private var container: AppContainer
     @EnvironmentObject private var coordinator: RecordingCoordinator
     @StateObject private var viewModel: StorageManagementViewModel
 
@@ -29,8 +30,7 @@ struct StorageManagementView: View {
             sessionListSection
             cleanupSection
             storageLimitSection
-            backupSection
-            backupNavigationSection
+            backupRestoreSection
         }
         .navigationTitle("Storage")
         .navigationBarTitleDisplayMode(.inline)
@@ -218,74 +218,6 @@ struct StorageManagementView: View {
         }
     }
 
-    // MARK: - Backup Section
-
-    private var backupSection: some View {
-        Section {
-            Button {
-                viewModel.createBackup()
-            } label: {
-                HStack {
-                    Label("Create Backup", systemImage: "arrow.down.doc")
-
-                    Spacer()
-
-                    if viewModel.isCreatingBackup {
-                        ProgressView()
-                    }
-                }
-            }
-            .disabled(viewModel.isCreatingBackup)
-
-            if viewModel.backups.isEmpty {
-                Text("No backups yet")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(viewModel.backups) { backup in
-                    backupRow(backup)
-                }
-            }
-        } header: {
-            Text("Backups")
-        } footer: {
-            Text("Backups contain the database only, not audio files.")
-        }
-    }
-
-    private func backupRow(_ backup: StorageManager.BackupInfo) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(backup.name)
-                    .font(.subheadline)
-                    .lineLimit(1)
-
-                Text(backup.createdAt, style: .date)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                + Text(" ")
-                + Text(backup.createdAt, style: .time)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Text(viewModel.formatBytes(backup.sizeBytes))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-
-            Button(role: .destructive) {
-                viewModel.requestDeleteBackup(at: backup.url)
-            } label: {
-                Image(systemName: "trash")
-                    .font(.caption)
-            }
-            .buttonStyle(.borderless)
-        }
-        .padding(.vertical, 2)
-    }
-
     // MARK: - Storage Limit Section
 
     private var storageLimitSection: some View {
@@ -314,15 +246,27 @@ struct StorageManagementView: View {
         }
     }
 
-    // MARK: - Backup Navigation Section
+    // MARK: - Backup & Restore Section
 
-    private var backupNavigationSection: some View {
+    private var backupRestoreSection: some View {
         Section {
             NavigationLink {
-                Text("Backup & Restore")
+                BackupView()
+                    .environmentObject(container)
             } label: {
-                Label("Backup & Restore", systemImage: "arrow.triangle.2.circlepath")
+                Label("Create Encrypted Backup", systemImage: "arrow.down.doc")
             }
+
+            NavigationLink {
+                RestoreView()
+                    .environmentObject(container)
+            } label: {
+                Label("Restore Encrypted Backup", systemImage: "arrow.up.doc")
+            }
+        } header: {
+            Text("Backup & Restore")
+        } footer: {
+            Text("Backups are encrypted and can include audio files.")
         }
     }
 
@@ -352,30 +296,6 @@ struct StorageManagementView: View {
                     viewModel.confirmDeleteExports()
                 },
                 secondaryButton: .cancel()
-            )
-
-        case .deleteBackupConfirmation(let url):
-            return Alert(
-                title: Text("Delete Backup"),
-                message: Text("This will permanently delete the backup \"\(url.lastPathComponent)\". This cannot be undone."),
-                primaryButton: .destructive(Text("Delete")) {
-                    viewModel.confirmDeleteBackup(at: url)
-                },
-                secondaryButton: .cancel()
-            )
-
-        case .backupSuccess(let url):
-            return Alert(
-                title: Text("Backup Created"),
-                message: Text("Backup saved as \"\(url.lastPathComponent)\"."),
-                dismissButton: .default(Text("OK"))
-            )
-
-        case .backupError(let message):
-            return Alert(
-                title: Text("Backup Failed"),
-                message: Text(message),
-                dismissButton: .default(Text("OK"))
             )
 
         case .cleanupResult(let count):
@@ -480,8 +400,12 @@ private struct StorageCategoryRow: View {
 
 // MARK: - Preview
 
-#Preview {
-    NavigationStack {
-        Text("StorageManagementView requires dependencies")
+#if DEBUG
+private struct StorageManagementView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            Text("StorageManagementView requires dependencies")
+        }
     }
 }
+#endif

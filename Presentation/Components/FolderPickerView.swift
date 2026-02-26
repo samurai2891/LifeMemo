@@ -148,13 +148,17 @@ struct FolderPickerView: View {
     }
 }
 
-#Preview {
-    FolderPickerView(
-        sessionId: UUID(),
-        currentFolderId: nil,
-        repository: SessionRepository(
-            context: CoreDataStack(modelName: "LifeMemo").viewContext,
-            fileStore: FileStore()
+#if DEBUG
+private struct FolderPickerView_Previews: PreviewProvider {
+    static var previews: some View {
+        FolderPickerView(
+            sessionId: UUID(),
+            currentFolderId: nil,
+            repository: SessionRepository(
+                context: CoreDataStack(modelName: "LifeMemo").viewContext,
+                fileStore: FileStore()
+            )
         )
-    )
+    }
 }
+#endif

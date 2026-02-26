@@ -19,6 +19,12 @@ DESTINATION="${DESTINATION:-${DEFAULT_DESTINATION}}"
 echo "[eval_stt] project=${PROJECT} scheme=${SCHEME}"
 echo "[eval_stt] destination=${DESTINATION}"
 
+if [[ "${DESTINATION}" == "generic/platform=iOS Simulator" ]]; then
+  echo "[eval_stt] ERROR: No concrete iOS Simulator destination was resolved." >&2
+  echo "[eval_stt] Launch or create a simulator device, then rerun." >&2
+  exit 70
+fi
+
 xcodebuild \
   -project "${PROJECT}" \
   -scheme "${SCHEME}" \

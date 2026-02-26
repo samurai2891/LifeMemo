@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreData
+import UIKit
 
 @MainActor
 final class AppContainer: ObservableObject {
@@ -52,6 +53,9 @@ final class AppContainer: ObservableObject {
 
     let transcriptionCapabilityChecker: TranscriptionCapabilityChecker
     let liveTranscriber: LiveTranscriber
+    let voiceEnrollmentRepository: VoiceEnrollmentRepository
+    let voiceEnrollmentService: VoiceEnrollmentService
+    let speakerIdentityMatcher: SpeakerIdentityMatcher
 
     // MARK: - v1.0: Security
 
@@ -81,6 +85,7 @@ final class AppContainer: ObservableObject {
     // MARK: - v1.0: Location
 
     let locationService: LocationService
+    private var notificationObservers: [NSObjectProtocol] = []
 
     // MARK: - Init
 
@@ -90,11 +95,24 @@ final class AppContainer: ObservableObject {
 
         let coreData = CoreDataStack(modelName: "LifeMemo")
         let fileStore = FileStore()
-        let repository = SessionRepository(context: coreData.viewContext, fileStore: fileStore)
+        let fts5Manager = FTS5Manager()
+        let voiceEnrollmentRepository = VoiceEnrollmentRepository()
+        let speakerIdentityMatcher = SpeakerIdentityMatcher()
+        let repository = SessionRepository(
+            context: coreData.viewContext,
+            fileStore: fileStore,
+            searchIndexer: fts5Manager,
+            voiceEnrollmentRepository: voiceEnrollmentRepository,
+            speakerIdentityMatcher: speakerIdentityMatcher
+        )
 
         self.coreData = coreData
         self.fileStore = fileStore
         self.repository = repository
+        self.fts5Manager = fts5Manager
+        self.voiceEnrollmentRepository = voiceEnrollmentRepository
+        self.speakerIdentityMatcher = speakerIdentityMatcher
+        self.voiceEnrollmentService = VoiceEnrollmentService(repository: voiceEnrollmentRepository)
 
         let speechPermission = SpeechPermissionService()
         self.speechPermission = speechPermission
@@ -179,13 +197,13 @@ final class AppContainer: ObservableObject {
         )
 
         // Phase 2B: Advanced Search
-        let fts5Manager = FTS5Manager()
-        self.fts5Manager = fts5Manager
         self.advancedSearch = AdvancedSearchService(
             fts5Manager: fts5Manager,
             context: coreData.viewContext
         )
         self.paginatedLoader = PaginatedSessionLoader(context: coreData.viewContext)
+        // Bootstrap the index for existing records created before index-sync wiring.
+        self.advancedSearch.rebuildSearchIndex()
 
         // Storage
         self.storageManager = StorageManager(
@@ -224,6 +242,17 @@ final class AppContainer: ObservableObject {
         // v1.0: Logging
         self.logExporter = AppLogExporter()
 
+        Task { [transcriptionQueue, recordingHealthMonitor] in
+            await transcriptionQueue.setTranscriptionCompletionHandler { success in
+                if success {
+                    recordingHealthMonitor.recordTranscriptionSuccess()
+                } else {
+                    recordingHealthMonitor.recordTranscriptionFailure()
+                }
+            }
+        }
+        setupTranscriptionQueueWakeObservers(queue: transcriptionQueue)
+
         // Wire memory pressure cleanup to Core Data
         memoryPressureMonitor.onShouldCleanup = { [weak coreData] in
             coreData?.viewContext.refreshAllObjects()
@@ -234,5 +263,45 @@ final class AppContainer: ObservableObject {
 
         // P1-02: Enforce zero external exposure on every launch
         exposureGuard.enforceOnLaunch()
+
+        // Wire auto-summary generation for queue-driven finalization.
+        let summaryBuilder = self.summarizer
+        Task { [transcriptionQueue] in
+            await transcriptionQueue.setAutoSummaryBuilder { sessionId in
+                let algorithm = SummarizationPreference.preferredAlgorithm
+                return summaryBuilder.buildSummaryMarkdown(
+                    sessionId: sessionId,
+                    algorithm: algorithm
+                )
+            }
+        }
+    }
+
+    deinit {
+        let center = NotificationCenter.default
+        for observer in notificationObservers {
+            center.removeObserver(observer)
+        }
+    }
+
+    private func setupTranscriptionQueueWakeObservers(queue: TranscriptionQueueActor) {
+        let center = NotificationCenter.default
+        let names: [Notification.Name] = [
+            .NSProcessInfoPowerStateDidChange,
+            ProcessInfo.thermalStateDidChangeNotification,
+            UIApplication.willEnterForegroundNotification
+        ]
+
+        notificationObservers = names.map { name in
+            center.addObserver(
+                forName: name,
+                object: nil,
+                queue: .main
+            ) { _ in
+                Task {
+                    await queue.onSystemConditionsChanged()
+                }
+            }
+        }
     }
 }

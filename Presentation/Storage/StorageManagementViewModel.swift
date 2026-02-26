@@ -31,18 +31,12 @@ final class StorageManagementViewModel: ObservableObject {
     enum AlertType: Identifiable {
         case deleteAudioConfirmation
         case deleteExportsConfirmation
-        case deleteBackupConfirmation(URL)
-        case backupSuccess(URL)
-        case backupError(String)
         case cleanupResult(Int)
 
         var id: String {
             switch self {
             case .deleteAudioConfirmation: return "deleteAudio"
             case .deleteExportsConfirmation: return "deleteExports"
-            case .deleteBackupConfirmation: return "deleteBackup"
-            case .backupSuccess: return "backupSuccess"
-            case .backupError: return "backupError"
             case .cleanupResult: return "cleanupResult"
             }
         }
@@ -58,7 +52,6 @@ final class StorageManagementViewModel: ObservableObject {
 
     @Published var selectedCleanupPeriod: CleanupPeriod = .thirtyDays
     @Published var activeAlert: AlertType?
-    @Published private(set) var isCreatingBackup = false
 
     @Published var storageLimitGB: Int {
         didSet {
@@ -99,10 +92,6 @@ final class StorageManagementViewModel: ObservableObject {
         storageManager.sessionStorageList
     }
 
-    var backups: [StorageManager.BackupInfo] {
-        storageManager.backups
-    }
-
     var isCalculating: Bool {
         storageManager.isCalculating
     }
@@ -136,30 +125,6 @@ final class StorageManagementViewModel: ObservableObject {
 
     func confirmDeleteExports() {
         storageManager.deleteAllExports()
-    }
-
-    // MARK: - Backup
-
-    func createBackup() {
-        isCreatingBackup = true
-
-        let result = storageManager.createBackup()
-        switch result {
-        case .success(let url):
-            activeAlert = .backupSuccess(url)
-        case .failure(let error):
-            activeAlert = .backupError(error.localizedDescription)
-        }
-
-        isCreatingBackup = false
-    }
-
-    func requestDeleteBackup(at url: URL) {
-        activeAlert = .deleteBackupConfirmation(url)
-    }
-
-    func confirmDeleteBackup(at url: URL) {
-        storageManager.deleteBackup(at: url)
     }
 
     // MARK: - Formatting

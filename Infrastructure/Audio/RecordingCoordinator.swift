@@ -54,6 +54,7 @@ final class RecordingCoordinator: ObservableObject {
         self.locationService = locationService
         self.transcriptionQueue = transcriptionQueue
         self.liveTranscriber = liveTranscriber
+        self.chunkRecorder.healthMonitor = healthMonitor
 
         setupInterruptionHandling()
     }
@@ -131,6 +132,7 @@ final class RecordingCoordinator: ObservableObject {
 
             // Flush transcription queue now that all chunks are finalized
             await transcriptionQueue.setRecordingActive(false)
+            repository.checkAndFinalizeSessionStatus(sessionId: sessionId)
 
             state = .idle
             elapsedSeconds = 0
@@ -149,8 +151,9 @@ final class RecordingCoordinator: ObservableObject {
     private func setupInterruptionHandling() {
         interruptionHandler.onShouldPause = { [weak self] in
             guard let self else { return }
-            // Pause chunked recording on interruption
+            // Pause both chunk recording and live transcription preview.
             Task { @MainActor in
+                self.liveTranscriber.pause()
                 await self.chunkRecorder.stop()
             }
         }
@@ -167,6 +170,7 @@ final class RecordingCoordinator: ObservableObject {
                         languageMode: self.currentLanguage,
                         config: audioConfig.toRecorderConfig()
                     )
+                    self.liveTranscriber.resume()
                 } catch {
                     let errorMessage = "Failed to resume after interruption: \(error.localizedDescription)"
                     self.state = .error(message: errorMessage)

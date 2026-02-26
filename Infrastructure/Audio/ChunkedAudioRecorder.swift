@@ -17,12 +17,14 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
         let sampleRate: Double
         let channels: Int
         let bitRate: Int
+        let encoderQualityRawValue: Int
 
         static let `default` = Config(
             chunkSeconds: 60,
             sampleRate: 16_000,
             channels: 1,
-            bitRate: 64_000
+            bitRate: 64_000,
+            encoderQualityRawValue: AVAudioQuality.medium.rawValue
         )
     }
 
@@ -36,6 +38,7 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
     // MARK: - Metering
 
     weak var meterCollector: AudioMeterCollector?
+    weak var healthMonitor: RecordingHealthMonitor?
 
     // MARK: - Internal State
 
@@ -140,7 +143,7 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
             AVSampleRateKey: activeConfig.sampleRate,
             AVNumberOfChannelsKey: activeConfig.channels,
             AVEncoderBitRateKey: activeConfig.bitRate,
-            AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue
+            AVEncoderAudioQualityKey: activeConfig.encoderQualityRawValue
         ]
 
         let audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
@@ -185,6 +188,11 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
             logger.warning(
                 "Discarding empty chunk \(chunkId.uuidString, privacy: .public) (size=\(fileSize), duration=\(duration))"
             )
+            repository.updateChunkTranscriptionStatus(
+                chunkId: chunkId,
+                status: .failed
+            )
+            repository.checkAndFinalizeSessionStatus(sessionId: sid)
             return
         }
 
@@ -199,6 +207,8 @@ final class ChunkedAudioRecorder: NSObject, AVAudioRecorderDelegate {
             durationSec: duration,
             sizeBytes: fileSize
         )
+        healthMonitor?.recordChunkCompleted()
+        healthMonitor?.updateLastFileModification(endAt)
 
         await transcriptionQueue.enqueue(chunkId: chunkId, sessionId: sid)
     }

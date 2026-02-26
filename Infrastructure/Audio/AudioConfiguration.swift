@@ -1,4 +1,5 @@
 import Foundation
+import AVFAudio
 
 /// Configurable audio recording parameters for balancing quality vs battery.
 ///
@@ -34,6 +35,7 @@ struct AudioConfiguration: Codable, Equatable {
     let channels: Int
     let chunkDurationSeconds: TimeInterval
     let bitRate: Int
+    let encoderQualityRawValue: Int
 
     /// Estimated relative battery impact (1.0 = baseline standard)
     var estimatedBatteryMultiplier: Double {
@@ -46,21 +48,24 @@ struct AudioConfiguration: Codable, Equatable {
         sampleRate: 8_000,
         channels: 1,
         chunkDurationSeconds: 60,
-        bitRate: 32_000
+        bitRate: 32_000,
+        encoderQualityRawValue: AVAudioQuality.low.rawValue
     )
 
     static let standard = AudioConfiguration(
         sampleRate: 16_000,
         channels: 1,
         chunkDurationSeconds: 60,
-        bitRate: 64_000
+        bitRate: 64_000,
+        encoderQualityRawValue: AVAudioQuality.medium.rawValue
     )
 
     static let high = AudioConfiguration(
         sampleRate: 44_100,
         channels: 1,
         chunkDurationSeconds: 60,
-        bitRate: 128_000
+        bitRate: 128_000,
+        encoderQualityRawValue: AVAudioQuality.max.rawValue
     )
 
     static func from(profile: QualityProfile) -> AudioConfiguration {
@@ -98,7 +103,8 @@ struct AudioConfiguration: Codable, Equatable {
             chunkSeconds: chunkDurationSeconds,
             sampleRate: sampleRate,
             channels: channels,
-            bitRate: bitRate
+            bitRate: bitRate,
+            encoderQualityRawValue: encoderQualityRawValue
         )
     }
 }

@@ -2,16 +2,35 @@ import Foundation
 import CoreData
 import os.log
 
+/// Abstraction for transcript full-text indexing.
+protocol TranscriptSearchIndexing {
+    func indexSegment(segmentId: UUID, sessionId: UUID, text: String)
+    func removeSegment(segmentId: UUID)
+    func removeSession(sessionId: UUID)
+}
+
 @MainActor
 final class SessionRepository {
 
     private let context: NSManagedObjectContext
     private let fileStore: FileStore
+    private let searchIndexer: TranscriptSearchIndexing?
+    private let voiceEnrollmentRepository: VoiceEnrollmentProfileStoring?
+    private let speakerIdentityMatcher: SpeakerIdentityMatching?
     private let logger = Logger(subsystem: "com.lifememo.app", category: "SessionRepository")
 
-    init(context: NSManagedObjectContext, fileStore: FileStore) {
+    init(
+        context: NSManagedObjectContext,
+        fileStore: FileStore,
+        searchIndexer: TranscriptSearchIndexing? = nil,
+        voiceEnrollmentRepository: VoiceEnrollmentProfileStoring? = nil,
+        speakerIdentityMatcher: SpeakerIdentityMatching? = nil
+    ) {
         self.context = context
         self.fileStore = fileStore
+        self.searchIndexer = searchIndexer
+        self.voiceEnrollmentRepository = voiceEnrollmentRepository
+        self.speakerIdentityMatcher = speakerIdentityMatcher
     }
 
     // MARK: - Session Lifecycle
@@ -133,7 +152,8 @@ final class SessionRepository {
         let durationMs = Int64(chunk.durationSec * 1000)
 
         let segment = TranscriptSegmentEntity(context: context)
-        segment.id = UUID()
+        let segmentId = UUID()
+        segment.id = segmentId
         segment.text = text
         segment.startMs = max(0, offsetMs)
         segment.endMs = max(0, offsetMs + durationMs)
@@ -143,7 +163,13 @@ final class SessionRepository {
         segment.chunk = chunk
 
         chunk.transcriptionStatus = .done
-        saveOrLog()
+        if saveOrLog() {
+            searchIndexer?.indexSegment(
+                segmentId: segmentId,
+                sessionId: sessionId,
+                text: text
+            )
+        }
     }
 
     /// Saves diarized transcript segments for a chunk (multiple segments per chunk).
@@ -155,7 +181,8 @@ final class SessionRepository {
         sessionId: UUID,
         chunkId: UUID,
         diarization: DiarizationResult,
-        fullText: String
+        fullText: String,
+        applyFallbackGuard: Bool = true
     ) {
         guard let session = fetchSession(id: sessionId),
               let chunk = fetchChunk(id: chunkId) else { return }
@@ -165,7 +192,7 @@ final class SessionRepository {
             diarization.segments.map(\.text).joined(separator: " ")
         )
 
-        if shouldFallbackToFullText(
+        if applyFallbackGuard && shouldFallbackToFullText(
             fullText: normalizedFullText,
             diarizedText: normalizedDiarizedText
         ) {
@@ -184,9 +211,13 @@ final class SessionRepository {
         let sessionStartedAt = session.startedAt ?? Date()
         let chunkOffsetMs = Int64(chunkStartAt.timeIntervalSince(sessionStartedAt) * 1000)
 
+        var indexedSegments: [(segmentId: UUID, text: String)] = []
+        indexedSegments.reserveCapacity(diarization.segments.count)
+
         for diarizedSeg in diarization.segments {
             let segment = TranscriptSegmentEntity(context: context)
-            segment.id = UUID()
+            let segmentId = UUID()
+            segment.id = segmentId
             segment.text = diarizedSeg.text
             segment.startMs = max(0, chunkOffsetMs + diarizedSeg.startOffsetMs)
             segment.endMs = max(0, chunkOffsetMs + diarizedSeg.endOffsetMs)
@@ -194,10 +225,19 @@ final class SessionRepository {
             segment.createdAt = Date()
             segment.session = session
             segment.chunk = chunk
+            indexedSegments.append((segmentId: segmentId, text: diarizedSeg.text))
         }
 
         chunk.transcriptionStatus = .done
-        saveOrLog()
+        if saveOrLog() {
+            for item in indexedSegments {
+                searchIndexer?.indexSegment(
+                    segmentId: item.segmentId,
+                    sessionId: sessionId,
+                    text: item.text
+                )
+            }
+        }
     }
 
     /// Updates the display name for a speaker in a session.
@@ -299,22 +339,35 @@ final class SessionRepository {
     /// Used to clean up old results before retranscription.
     func deleteSegmentsForChunk(chunkId: UUID) {
         guard let chunk = fetchChunk(id: chunkId) else { return }
+        var removedSegmentIds: [UUID] = []
         if let segments = chunk.segments as? Set<TranscriptSegmentEntity> {
             for segment in segments {
+                if let segmentId = segment.id {
+                    removedSegmentIds.append(segmentId)
+                }
                 context.delete(segment)
             }
         }
-        saveOrLog()
+        if saveOrLog() {
+            for segmentId in removedSegmentIds {
+                searchIndexer?.removeSegment(segmentId: segmentId)
+            }
+        }
     }
 
     /// Resets a single chunk for retranscription: deletes existing segments, sets chunk
     /// status to `.pending`, and transitions the session back to `.processing`.
     /// Saves once at the end for efficiency.
     func resetChunkForRetranscription(chunkId: UUID, sessionId: UUID) {
+        var removedSegmentIds: [UUID] = []
+
         // Delete segments (without intermediate save)
         if let chunk = fetchChunk(id: chunkId),
            let segments = chunk.segments as? Set<TranscriptSegmentEntity> {
             for segment in segments {
+                if let segmentId = segment.id {
+                    removedSegmentIds.append(segmentId)
+                }
                 context.delete(segment)
             }
         }
@@ -330,15 +383,24 @@ final class SessionRepository {
             session.status = .processing
         }
 
-        saveOrLog()
+        if saveOrLog() {
+            for segmentId in removedSegmentIds {
+                searchIndexer?.removeSegment(segmentId: segmentId)
+            }
+        }
     }
 
     /// Resets multiple chunks for retranscription in a single batch save.
     func resetChunksForRetranscription(chunkIds: [UUID], sessionId: UUID) {
+        var removedSegmentIds: [UUID] = []
+
         for chunkId in chunkIds {
             if let chunk = fetchChunk(id: chunkId),
                let segments = chunk.segments as? Set<TranscriptSegmentEntity> {
                 for segment in segments {
+                    if let segmentId = segment.id {
+                        removedSegmentIds.append(segmentId)
+                    }
                     context.delete(segment)
                 }
                 chunk.transcriptionStatus = .pending
@@ -350,7 +412,11 @@ final class SessionRepository {
             session.status = .processing
         }
 
-        saveOrLog()
+        if saveOrLog() {
+            for segmentId in removedSegmentIds {
+                searchIndexer?.removeSegment(segmentId: segmentId)
+            }
+        }
     }
 
     // MARK: - Live Edit Records
@@ -368,13 +434,13 @@ final class SessionRepository {
     /// Called once when all chunks have finished transcription. Does not save — caller is responsible.
     private func alignSpeakersAcrossChunks(session: SessionEntity) {
         let profilesByChunk = session.speakerProfiles
-        guard profilesByChunk.count > 1 else { return }
+        guard !profilesByChunk.isEmpty else { return }
 
         let chunkSpeakers = profilesByChunk
             .sorted { $0.key < $1.key }
             .map { CrossChunkSpeakerAligner.ChunkSpeakers(chunkIndex: $0.key, profiles: $0.value) }
 
-        let (alignmentMap, _) = CrossChunkSpeakerAligner.align(chunkSpeakers: chunkSpeakers)
+        let (alignmentMap, globalProfiles) = CrossChunkSpeakerAligner.align(chunkSpeakers: chunkSpeakers)
 
         // Apply alignment to transcript segments
         let chunks = session.chunksArray
@@ -390,13 +456,52 @@ final class SessionRepository {
                 }
             }
         }
+
+        applyEnrolledIdentityIfAvailable(
+            session: session,
+            globalProfiles: globalProfiles
+        )
+    }
+
+    private func applyEnrolledIdentityIfAvailable(
+        session: SessionEntity,
+        globalProfiles: [SpeakerProfile]
+    ) {
+        guard let voiceEnrollmentRepository,
+              let speakerIdentityMatcher,
+              let enrollment = voiceEnrollmentRepository.activeProfile(),
+              enrollment.isActive else { return }
+
+        guard let assignment = speakerIdentityMatcher.match(
+            globalProfiles: globalProfiles,
+            enrollment: enrollment
+        ) else { return }
+
+        guard assignment.result.identity == .me else { return }
+
+        var names = session.speakerNames
+        let existing = names[assignment.globalSpeakerIndex]
+        if existing == nil || existing == enrollment.displayName {
+            names[assignment.globalSpeakerIndex] = enrollment.displayName
+            session.setSpeakerNames(names)
+        }
+
+        guard speakerIdentityMatcher.shouldAdaptProfile(from: assignment.result),
+              let matched = globalProfiles.first(where: { $0.speakerIndex == assignment.globalSpeakerIndex }),
+              let adapted = speakerIdentityMatcher.adapt(
+                profile: enrollment,
+                matchedProfile: matched
+              ) else { return }
+        voiceEnrollmentRepository.saveActiveProfile(adapted)
     }
 
     /// Reconciles live edits with final transcription segments, applying matched
     /// edits and clearing the JSON afterwards. Does not save — caller is responsible.
-    private func applyLiveEdits(for session: SessionEntity) {
+    private func applyLiveEdits(for session: SessionEntity) -> [(segmentId: UUID, text: String)] {
         let records = session.liveEditRecords
-        guard !records.isEmpty else { return }
+        guard !records.isEmpty else { return [] }
+
+        var updatedSegments: [(segmentId: UUID, text: String)] = []
 
         let finalSegments = session.segmentsArray.map {
             (id: $0.id ?? UUID(), text: $0.text ?? "")
@@ -420,8 +525,11 @@ final class SessionRepository {
             historyEntry.segment = segment
             segment.text = match.editedText
             segment.isUserEdited = true
+            let segmentId = segment.id ?? match.segmentId
+            updatedSegments.append((segmentId: segmentId, text: match.editedText))
         }
         session.liveEditsJSON = nil
+        return updatedSegments
     }
 
     // MARK: - Session Finalization
@@ -444,7 +552,7 @@ final class SessionRepository {
 
         if allFinished {
             alignSpeakersAcrossChunks(session: session)
-            applyLiveEdits(for: session)
+            let updatedSegments = applyLiveEdits(for: session)
             let hasFailures = chunks.contains { $0.transcriptionStatus == .failed }
             session.status = hasFailures ? .error : .ready
             if hasFailures {
@@ -452,7 +560,15 @@ final class SessionRepository {
                     "Session finalized with failed chunks: \(sessionId.uuidString, privacy: .public)"
                 )
             }
-            saveOrLog()
+            if saveOrLog() {
+                for updated in updatedSegments {
+                    searchIndexer?.indexSegment(
+                        segmentId: updated.segmentId,
+                        sessionId: sessionId,
+                        text: updated.text
+                    )
+                }
+            }
         }
     }
 
@@ -481,7 +597,13 @@ final class SessionRepository {
 
         segment.text = trimmed
         segment.isUserEdited = true
-        saveOrLog()
+        if saveOrLog(), let sessionId = segment.session?.id {
+            searchIndexer?.indexSegment(
+                segmentId: segmentId,
+                sessionId: sessionId,
+                text: trimmed
+            )
+        }
     }
 
     func renameSession(sessionId: UUID, newTitle: String) {
@@ -531,7 +653,15 @@ final class SessionRepository {
             context.delete(entry)
         }
 
-        saveOrLog()
+        if saveOrLog(),
+           let updatedText = segment.text,
+           let sessionId = segment.session?.id {
+            searchIndexer?.indexSegment(
+                segmentId: segmentId,
+                sessionId: sessionId,
+                text: updatedText
+            )
+        }
     }
 
     /// Reverts a segment to its original (pre-edit) text, deleting all edit history.
@@ -548,7 +678,13 @@ final class SessionRepository {
             context.delete(entry)
         }
 
-        saveOrLog()
+        if saveOrLog(), let sessionId = segment.session?.id {
+            searchIndexer?.indexSegment(
+                segmentId: segmentId,
+                sessionId: sessionId,
+                text: original
+            )
+        }
     }
 
     // MARK: - Tags
@@ -692,20 +828,28 @@ final class SessionRepository {
 
         fileStore.deleteSessionAudioDir(sessionId: session.id ?? sessionId)
         context.delete(session)
-        saveOrLog()
+        if saveOrLog() {
+            searchIndexer?.removeSession(sessionId: sessionId)
+        }
     }
 
     /// Deletes multiple sessions completely (audio + data) in a single save.
     @discardableResult
     func deleteSessionsCompletely(sessionIds: Set<UUID>) -> Int {
         var count = 0
+        var deletedSessionIds: [UUID] = []
         for sessionId in sessionIds {
             guard let session = fetchSession(id: sessionId) else { continue }
             fileStore.deleteSessionAudioDir(sessionId: session.id ?? sessionId)
             context.delete(session)
+            deletedSessionIds.append(sessionId)
             count += 1
         }
-        saveOrLog()
+        if saveOrLog() {
+            for deletedSessionId in deletedSessionIds {
+                searchIndexer?.removeSession(sessionId: deletedSessionId)
+            }
+        }
         return count
     }
 
@@ -945,6 +1089,9 @@ final class SessionRepository {
 
         session.speakerNamesJSON = backup.speakerNamesJSON
 
+        var indexedSegments: [(segmentId: UUID, text: String)] = []
+        indexedSegments.reserveCapacity(backup.segments.count)
+
         for segmentBackup in backup.segments {
             let segment = TranscriptSegmentEntity(context: context)
             segment.id = segmentBackup.id
@@ -956,6 +1103,7 @@ final class SessionRepository {
             segment.speakerIndex = segmentBackup.speakerIndex
             segment.createdAt = segmentBackup.createdAt
             segment.session = session
+            indexedSegments.append((segmentId: segmentBackup.id, text: segmentBackup.text))
 
             for historyBackup in segmentBackup.editHistory {
                 let historyEntry = EditHistoryEntity(context: context)
@@ -977,7 +1125,15 @@ final class SessionRepository {
             highlight.session = session
         }
 
-        saveOrLog()
+        if saveOrLog() {
+            for indexedSegment in indexedSegments {
+                searchIndexer?.indexSegment(
+                    segmentId: indexedSegment.segmentId,
+                    sessionId: backup.id,
+                    text: indexedSegment.text
+                )
+            }
+        }
     }
 
     // MARK: - Private Helpers
@@ -1034,12 +1190,15 @@ final class SessionRepository {
         }
     }
 
-    private func saveOrLog() {
-        guard context.hasChanges else { return }
+    @discardableResult
+    private func saveOrLog() -> Bool {
+        guard context.hasChanges else { return true }
         do {
             try context.save()
+            return true
         } catch {
             logger.error("CoreData save error: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 }
